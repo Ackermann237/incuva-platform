@@ -1,0 +1,801 @@
+# Translations template for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-06-06 21:35+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: app/templates/base.html:6
+msgid "INCUVA - Osez la liberté"
+msgstr ""
+
+#: app/templates/base.html:297 app/templates/base.html:340
+msgid "Accueil INCUVA"
+msgstr ""
+
+#: app/templates/base.html:305
+msgid "Accueil"
+msgstr ""
+
+#: app/templates/base.html:306
+msgid "S’inscrire"
+msgstr ""
+
+#: app/templates/base.html:307
+msgid "Services"
+msgstr ""
+
+#: app/templates/base.html:309 app/templates/base.html:316
+msgid "Dashboard"
+msgstr ""
+
+#: app/templates/base.html:317
+msgid "Déconnexion"
+msgstr ""
+
+#: app/templates/auth/login.html:8 app/templates/base.html:319
+msgid "Connexion"
+msgstr ""
+
+#: app/templates/base.html:322
+msgid "Changer de langue"
+msgstr ""
+
+#: app/templates/base.html:324
+msgid "Français"
+msgstr ""
+
+#: app/templates/base.html:325
+msgid "English"
+msgstr ""
+
+#: app/templates/base.html:326
+msgid "Español"
+msgstr ""
+
+#: app/templates/base.html:343
+msgid ""
+"INCUVA connecte les talents à travers le monde avec des solutions simples"
+" et innovantes. Osez la liberté dès aujourd'hui."
+msgstr ""
+
+#: app/templates/base.html:347
+msgid "À propos"
+msgstr ""
+
+#: app/templates/base.html:348
+msgid "Contact"
+msgstr ""
+
+#: app/templates/base.html:349
+msgid "Politique de confidentialité"
+msgstr ""
+
+#: app/templates/base.html:350
+msgid "Conditions d'utilisation"
+msgstr ""
+
+#: app/templates/base.html:361
+msgid "© 2025 INCUVA. Tous droits réservés. | Osez la liberté."
+msgstr ""
+
+#: app/templates/home.html:3
+msgid "Accueil - INCUVA"
+msgstr ""
+
+#: app/templates/home.html:14
+msgid "Présentation INCUVA"
+msgstr ""
+
+#: app/templates/home.html:15
+msgid "Slide précédent"
+msgstr ""
+
+#: app/templates/home.html:16
+msgid "Slide suivant"
+msgstr ""
+
+#: app/templates/home.html:19
+msgid "Pour les entreprises en quête de performance"
+msgstr ""
+
+#: app/templates/home.html:24
+msgid "Gérer les recrutements n’a jamais été aussi simple"
+msgstr ""
+
+#: app/templates/home.html:29
+msgid "Trouvez des salariés qualifiés, fiables et disponibles"
+msgstr ""
+
+#: app/templates/home.html:34
+msgid "Dans le monde entier, sans barrière"
+msgstr ""
+
+#: app/templates/home.html:39
+msgid "En tant que particulier, que vous soyez garagiste…"
+msgstr ""
+
+#: app/templates/home.html:44
+msgid "Soudeur ? Travaillez où vous voulez"
+msgstr ""
+
+#: app/templates/home.html:49
+msgid "Ou cuisinier ? INCUVA vous connecte"
+msgstr ""
+
+#: app/templates/home.html:54
+msgid "INCUVA est la plateforme universelle des talents"
+msgstr ""
+
+#: app/templates/home.html:69 app/templates/home.html:201
+msgid "Pourquoi choisir INCUVA ?"
+msgstr ""
+
+#: app/templates/home.html:73
+msgid "Réduction des coûts de recrutement pour les PME"
+msgstr ""
+
+#: app/templates/home.html:77
+msgid "Gain de temps dans la gestion RH"
+msgstr ""
+
+#: app/templates/home.html:81
+msgid "Talents qualifiés accessibles dès le lancement"
+msgstr ""
+
+#: app/templates/home.html:85
+msgid "Taux de satisfaction estimé (tests bêta)"
+msgstr ""
+
+#: app/templates/home.html:93
+msgid "Vivez une meilleure"
+msgstr ""
+
+#: app/templates/home.html:94
+msgid "gestion RH"
+msgstr ""
+
+#: app/templates/home.html:96
+msgid ""
+"Répondez à quelques questions, et nous vous aiderons à trouver la "
+"solution RH et paie parfaite."
+msgstr ""
+
+#: app/templates/home.html:98
+msgid "# d’employés"
+msgstr ""
+
+#: app/templates/home.html:100
+msgid "Dans quoi êtes-vous intéressé ?"
+msgstr ""
+
+#: app/templates/home.html:101 app/templates/home.html:169
+#: app/templates/home.html:185
+msgid "Paie"
+msgstr ""
+
+#: app/templates/home.html:102
+msgid "Avantages"
+msgstr ""
+
+#: app/templates/home.html:103
+msgid "Gestion RH"
+msgstr ""
+
+#: app/templates/home.html:105
+msgid "C’est parti !"
+msgstr ""
+
+#: app/templates/home.html:119
+msgid "La plateforme pour vos talents, vos finances et vos agents"
+msgstr ""
+
+#: app/templates/home.html:120
+msgid ""
+"Propulsez votre entreprise avec une plateforme puissante qui garde vos "
+"talents alignés, vos décisions précises et vos agents performants. C’est "
+"INCUVA."
+msgstr ""
+
+#: app/templates/home.html:122
+msgid "Explorer INCUVA"
+msgstr ""
+
+#: app/templates/home.html:123
+msgid "Pourquoi INCUVA ?"
+msgstr ""
+
+#: app/templates/home.html:127
+msgid "Image inspirante"
+msgstr ""
+
+#: app/templates/home.html:134
+msgid "Fonctionnalités clés d’INCUVA"
+msgstr ""
+
+#: app/templates/home.html:138
+msgid "Messagerie avancée"
+msgstr ""
+
+#: app/templates/home.html:139
+msgid "Échangez textes, images, audio, vidéos et documents en temps réel."
+msgstr ""
+
+#: app/templates/home.html:143
+msgid "Réservations simples"
+msgstr ""
+
+#: app/templates/home.html:144
+msgid "Choisissez date, heure et lieu pour vos services, en un clic."
+msgstr ""
+
+#: app/templates/home.html:148
+msgid "Géolocalisation"
+msgstr ""
+
+#: app/templates/home.html:149
+msgid "Trouvez des prestataires autour de vous et consultez leur position."
+msgstr ""
+
+#: app/templates/home.html:153
+msgid "Favoris & historique"
+msgstr ""
+
+#: app/templates/home.html:154
+msgid "Sauvegardez vos prestataires préférés et suivez vos réservations."
+msgstr ""
+
+#: app/templates/home.html:161
+msgid "Solutions pour votre entreprise"
+msgstr ""
+
+#: app/templates/home.html:164
+msgid "Icône Petite Entreprise"
+msgstr ""
+
+#: app/templates/home.html:165
+msgid "1-49 Employés"
+msgstr ""
+
+#: app/templates/home.html:166
+msgid "Petite Entreprise"
+msgstr ""
+
+#: app/templates/home.html:167
+msgid ""
+"Plus rapide, plus simple, des solutions RH et paie fiables pour vous "
+"concentrer sur l’essentiel."
+msgstr ""
+
+#: app/templates/home.html:170 app/templates/home.html:186
+msgid "Organisation Employeur (PEO)"
+msgstr ""
+
+#: app/templates/home.html:171 app/templates/home.html:187
+msgid "Temps & Présence"
+msgstr ""
+
+#: app/templates/home.html:174
+msgid "Avantages Sociaux"
+msgstr ""
+
+#: app/templates/home.html:175
+msgid "Formation & Développement"
+msgstr ""
+
+#: app/templates/home.html:177 app/templates/home.html:194
+#: app/templates/home.html:316
+msgid "Voir plus"
+msgstr ""
+
+#: app/templates/home.html:180
+msgid "Icône Entreprise Moyenne"
+msgstr ""
+
+#: app/templates/home.html:181
+msgid "50-999 Employés"
+msgstr ""
+
+#: app/templates/home.html:182
+msgid "Entreprise Moyenne"
+msgstr ""
+
+#: app/templates/home.html:183
+msgid ""
+"Des solutions paie supérieures et des technologies RH conçues pour gérer "
+"facilement toute votre main-d'œuvre."
+msgstr ""
+
+#: app/templates/home.html:190
+msgid "Gestion des Talents"
+msgstr ""
+
+#: app/templates/home.html:191
+msgid "Analytique RH"
+msgstr ""
+
+#: app/templates/home.html:192
+msgid "Conformité Réglementaire"
+msgstr ""
+
+#: app/templates/home.html:205
+msgid "Large réseau mondial"
+msgstr ""
+
+#: app/templates/home.html:206
+msgid ""
+"Accédez à des milliers de prestataires qualifiés dans tous les domaines, "
+"partout dans le monde."
+msgstr ""
+
+#: app/templates/home.html:210
+msgid "Simplicité & rapidité"
+msgstr ""
+
+#: app/templates/home.html:211
+msgid ""
+"Une interface intuitive pour trouver et réserver le service idéal en "
+"quelques clics."
+msgstr ""
+
+#: app/templates/home.html:215
+msgid "Confiance & sécurité"
+msgstr ""
+
+#: app/templates/home.html:216
+msgid ""
+"Des profils vérifiés, des avis authentiques et un paiement sécurisé pour "
+"une expérience sereine."
+msgstr ""
+
+#: app/templates/home.html:223
+msgid "Comment ça marche ?"
+msgstr ""
+
+#: app/templates/home.html:227
+msgid "1. Trouvez votre prestataire"
+msgstr ""
+
+#: app/templates/home.html:228
+msgid "Recherchez selon vos critères, géolocalisation, métier ou disponibilité."
+msgstr ""
+
+#: app/templates/home.html:232
+msgid "2. Réservez en toute simplicité"
+msgstr ""
+
+#: app/templates/home.html:233
+msgid ""
+"Choisissez votre créneau, envoyez votre demande, et confirmez la "
+"réservation."
+msgstr ""
+
+#: app/templates/home.html:237
+msgid "3. Échangez & collaborez"
+msgstr ""
+
+#: app/templates/home.html:238
+msgid "Communiquez facilement via notre messagerie intégrée et gérez vos projets."
+msgstr ""
+
+#: app/templates/home.html:245
+msgid "Ce que nos utilisateurs disent"
+msgstr ""
+
+#: app/templates/home.html:248
+msgid "Photo de Marie D."
+msgstr ""
+
+#: app/templates/home.html:249
+msgid "Marie D., Cliente"
+msgstr ""
+
+#: app/templates/home.html:250
+msgid ""
+"\"Grâce à INCUVA, j’ai trouvé un garagiste fiable en 2 clics, et la "
+"messagerie m’a permis de tout organiser rapidement !\""
+msgstr ""
+
+#: app/templates/home.html:253
+msgid "Photo de Jean P."
+msgstr ""
+
+#: app/templates/home.html:254
+msgid "Jean P., Prestataire"
+msgstr ""
+
+#: app/templates/home.html:255
+msgid ""
+"\"Je travaille où je veux, quand je veux. INCUVA m’a connecté à des "
+"clients dans ma ville et à l’international.\""
+msgstr ""
+
+#: app/templates/home.html:262
+msgid "Explorez le volet emploi"
+msgstr ""
+
+#: app/templates/home.html:266
+msgid "Pour les entreprises"
+msgstr ""
+
+#: app/templates/home.html:267
+msgid ""
+"Publiez des offres d’emploi, gérez les candidatures et trouvez les "
+"meilleurs talents."
+msgstr ""
+
+#: app/templates/home.html:268
+msgid "Poster une offre"
+msgstr ""
+
+#: app/templates/home.html:272
+msgid "Pour les candidats"
+msgstr ""
+
+#: app/templates/home.html:273
+msgid ""
+"Recherchez des emplois, postulez et gérez vos candidatures en toute "
+"simplicité."
+msgstr ""
+
+#: app/templates/home.html:274
+msgid "Trouver un emploi"
+msgstr ""
+
+#: app/templates/home.html:281
+msgid "Notre vision : Osez la liberté"
+msgstr ""
+
+#: app/templates/home.html:282
+msgid ""
+"Avec INCUVA, nous repoussons les limites : intégration de l’IA pour des "
+"recommandations intelligentes, smart contracts pour des transactions "
+"sécurisées, et une expansion mondiale pour connecter les talents partout."
+msgstr ""
+
+#: app/templates/home.html:283
+msgid "En savoir plus"
+msgstr ""
+
+#: app/templates/home.html:288
+msgid "INCUVA, à portée de main"
+msgstr ""
+
+#: app/templates/home.html:289
+msgid ""
+"Téléchargez notre application pour connecter clients et prestataires, où "
+"que vous soyez."
+msgstr ""
+
+#: app/templates/home.html:292
+msgid "Télécharger sur l’App Store"
+msgstr ""
+
+#: app/templates/home.html:295
+msgid "Télécharger sur Google Play"
+msgstr ""
+
+#: app/templates/home.html:301
+msgid "Appel à l'action"
+msgstr ""
+
+#: app/templates/home.html:302
+msgid "Prêt à libérer votre potentiel ?"
+msgstr ""
+
+#: app/templates/home.html:303
+msgid "Inscrivez-vous gratuitement"
+msgstr ""
+
+#: app/templates/home.html:316
+msgid "Masquer"
+msgstr ""
+
+#: app/templates/auth/login.html:2
+msgid "Connexion - INCUVA"
+msgstr ""
+
+#: app/templates/auth/login.html:9
+msgid "Accédez à votre compte INCUVA pour commencer !"
+msgstr ""
+
+#: app/templates/auth/login.html:21 app/templates/auth/profile.html:20
+#: app/templates/auth/register.html:30
+#: app/templates/auth/reset_password.html:27
+#: app/templates/dashboard/user_profile.html:14
+msgid "Email"
+msgstr ""
+
+#: app/templates/auth/login.html:25 app/templates/auth/register.html:56
+#: app/templates/auth/register_company.html:52
+msgid "Mot de passe"
+msgstr ""
+
+#: app/templates/auth/login.html:33
+msgid "Pas encore de compte ?"
+msgstr ""
+
+#: app/templates/auth/login.html:33
+msgid "Inscrivez-vous ici"
+msgstr ""
+
+#: app/templates/auth/login.html:34
+msgid "Mot de passe oublié ?"
+msgstr ""
+
+#: app/templates/auth/profile.html:2
+msgid "Profil - INCUVA"
+msgstr ""
+
+#: app/templates/auth/profile.html:5
+msgid "Profil"
+msgstr ""
+
+#: app/templates/auth/profile.html:7
+msgid "Type de compte"
+msgstr ""
+
+#: app/templates/auth/profile.html:9 app/templates/auth/register.html:26
+msgid "Nom"
+msgstr ""
+
+#: app/templates/auth/profile.html:10 app/templates/auth/profile.html:17
+#: app/templates/auth/register.html:38
+#: app/templates/auth/register_company.html:34
+msgid "Pays"
+msgstr ""
+
+#: app/templates/auth/profile.html:11 app/templates/auth/profile.html:15
+#: app/templates/auth/register.html:45
+#: app/templates/auth/register_company.html:30
+msgid "Ville"
+msgstr ""
+
+#: app/templates/auth/profile.html:12 app/templates/auth/register.html:49
+msgid "Rôle"
+msgstr ""
+
+#: app/templates/auth/profile.html:14
+msgid "Nom de l'entreprise"
+msgstr ""
+
+#: app/templates/auth/profile.html:16
+msgid "Taille"
+msgstr ""
+
+#: app/templates/auth/profile.html:18
+msgid "Secteur"
+msgstr ""
+
+#: app/templates/auth/profile.html:21
+msgid "Inscrit depuis"
+msgstr ""
+
+#: app/templates/auth/profile.html:22
+msgid "Dernière connexion"
+msgstr ""
+
+#: app/templates/auth/profile.html:23
+msgid "Photo de profil"
+msgstr ""
+
+#: app/templates/auth/profile.html:24
+msgid "Modifier le profil"
+msgstr ""
+
+#: app/templates/auth/profile.html:26
+msgid "Aucune information de profil disponible."
+msgstr ""
+
+#: app/templates/auth/register.html:2
+msgid "Inscription Particulier - INCUVA"
+msgstr ""
+
+#: app/templates/auth/register.html:8
+msgid "Inscription en tant que particulier"
+msgstr ""
+
+#: app/templates/auth/register.html:9
+msgid "Rejoignez INCUVA pour trouver des opportunités uniques !"
+msgstr ""
+
+#: app/templates/auth/register.html:10
+#: app/templates/auth/register_company.html:10
+msgid ""
+"Un code de vérification sera envoyé à votre adresse email après "
+"soumission."
+msgstr ""
+
+#: app/templates/auth/register.html:22
+msgid "Prénom"
+msgstr ""
+
+#: app/templates/auth/register.html:34
+msgid "Numéro de téléphone"
+msgstr ""
+
+#: app/templates/auth/register.html:60
+#: app/templates/auth/register_company.html:56
+msgid "Confirmez le mot de passe"
+msgstr ""
+
+#: app/templates/auth/register.html:68
+#: app/templates/auth/register_company.html:64
+msgid "Déjà un compte ?"
+msgstr ""
+
+#: app/templates/auth/register.html:68
+#: app/templates/auth/register_company.html:64
+msgid "Connectez-vous ici"
+msgstr ""
+
+#: app/templates/auth/register_company.html:2
+msgid "Inscription Entreprise - INCUVA"
+msgstr ""
+
+#: app/templates/auth/register_company.html:8
+msgid "Inscription en tant qu’entreprise"
+msgstr ""
+
+#: app/templates/auth/register_company.html:9
+msgid "Créez un compte pour accéder à des talents qualifiés !"
+msgstr ""
+
+#: app/templates/auth/register_company.html:22
+msgid "Email de l’entreprise"
+msgstr ""
+
+#: app/templates/auth/register_company.html:26
+msgid "Nom de l’entreprise"
+msgstr ""
+
+#: app/templates/auth/register_company.html:41
+msgid "Taille de l’entreprise"
+msgstr ""
+
+#: app/templates/auth/register_company.html:48
+msgid "Secteur d’activité"
+msgstr ""
+
+#: app/templates/auth/reset_password.html:2
+msgid "Réinitialisation du mot de passe - INCUVA"
+msgstr ""
+
+#: app/templates/auth/reset_password.html:7
+msgid "Réinitialisation du mot de passe"
+msgstr ""
+
+#: app/templates/auth/reset_password.html:10
+msgid "Entrez votre nouveau mot de passe."
+msgstr ""
+
+#: app/templates/auth/reset_password.html:12
+msgid "Entrez votre adresse email pour recevoir un lien de réinitialisation."
+msgstr ""
+
+#: app/templates/auth/reset_password.html:30
+msgid "Nouveau mot de passe"
+msgstr ""
+
+#: app/templates/auth/reset_password.html:39
+msgid "Retour à la connexion"
+msgstr ""
+
+#: app/templates/auth/verify_email.html:2
+msgid "Vérification de l'email - INCUVA"
+msgstr ""
+
+#: app/templates/auth/verify_email.html:7
+msgid "Vérification de l'email"
+msgstr ""
+
+#: app/templates/auth/verify_email.html:8
+msgid ""
+"Un code de vérification a été envoyé à votre adresse email. Veuillez "
+"entrer le code ci-dessous pour continuer."
+msgstr ""
+
+#: app/templates/auth/verify_email.html:20
+msgid "Code de vérification"
+msgstr ""
+
+#: app/templates/auth/verify_email.html:31
+msgid "Vous n'avez pas reçu le code ?"
+msgstr ""
+
+#: app/templates/auth/verify_email.html:31
+msgid "Renvoyer le code"
+msgstr ""
+
+#: app/templates/auth/verify_email.html:32
+msgid "Retour à l'inscription"
+msgstr ""
+
+#: app/templates/dashboard/company_profile.html:2
+msgid "Company Profile - INCUVA"
+msgstr ""
+
+#: app/templates/dashboard/company_profile.html:5
+msgid "Company Profile"
+msgstr ""
+
+#: app/templates/dashboard/company_profile.html:10
+#: app/templates/dashboard/user_profile.html:27
+msgid "City"
+msgstr ""
+
+#: app/templates/dashboard/company_profile.html:14
+msgid "Company Name"
+msgstr ""
+
+#: app/templates/dashboard/company_profile.html:18
+msgid "Company Size"
+msgstr ""
+
+#: app/templates/dashboard/company_profile.html:25
+#: app/templates/dashboard/user_profile.html:18
+msgid "Country"
+msgstr ""
+
+#: app/templates/dashboard/company_profile.html:34
+msgid "Industry"
+msgstr ""
+
+#: app/templates/dashboard/company_profile.html:38
+#: app/templates/dashboard/user_profile.html:38
+msgid "Profile Image"
+msgstr ""
+
+#: app/templates/dashboard/company_profile.html:41
+#: app/templates/dashboard/user_profile.html:41
+msgid "Update Profile"
+msgstr ""
+
+#: app/templates/dashboard/company_profile.html:44
+msgid "No company data available."
+msgstr ""
+
+#: app/templates/dashboard/user_dashboard.html:2
+msgid "Dashboard - INCUVA"
+msgstr ""
+
+#: app/templates/dashboard/user_dashboard.html:5
+msgid "Bienvenue sur votre Dashboard"
+msgstr ""
+
+#: app/templates/dashboard/user_dashboard.html:6
+msgid "Ceci est votre tableau de bord."
+msgstr ""
+
+#: app/templates/dashboard/user_profile.html:2
+msgid "User Profile - INCUVA"
+msgstr ""
+
+#: app/templates/dashboard/user_profile.html:5
+msgid "My Profile"
+msgstr ""
+
+#: app/templates/dashboard/user_profile.html:10
+msgid "Name"
+msgstr ""
+
+#: app/templates/dashboard/user_profile.html:31
+msgid "Role"
+msgstr ""
+
+#: app/templates/dashboard/user_profile.html:44
+msgid "No user data available."
+msgstr ""
+
