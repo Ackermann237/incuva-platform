@@ -128,7 +128,7 @@ export default function CandidateView() {
                     {apps.length}
                   </div>
                 </div>
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{job.description}</p>
+                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{(job.description || '').replace(/\*\*/g, '')}</p>
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <span>{job.location}</span>
                   <span>{format(toJSDate(job.submitted_at), "dd MMMM yyyy", { locale: fr })}</span>

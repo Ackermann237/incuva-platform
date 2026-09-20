@@ -1,20 +1,18 @@
 // src/layouts/UserLayout.jsx
 import React, {useState, Suspense, lazy, useEffect} from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Layers, Briefcase, FileText, MessageSquare, ChevronLeft, ChevronRight, Users, FileUp } from "lucide-react";
+import { Layers, Briefcase, FileText, MessageSquare, ChevronLeft, ChevronRight, Users } from "lucide-react";
 
 // Lazy loading des vraies pages
 const UserDashboard = lazy(() => import("../pages/Dashboard/UserDashboard"));
 const OffersAvailable = lazy(() => import("../pages/Offers/OffersAvailable"));
 const MyApplications = lazy(() => import("../pages/Offers/MyApplications/MyApplications.jsx"));
-const NewService = lazy(() => import("../pages/Jobs/users/NewService"));
 const UserProfil = lazy(() => import("../pages/Profil/UserProfil"));
 
 const navItems = [
   { id: "dashboard", name: "Tableau de bord", icon: Layers, component: UserDashboard },
   { id: "offers", name: "Offres d'emploi", icon: Briefcase, component: OffersAvailable },
   { id: "applications", name: "Mes candidatures", icon: FileText, component: MyApplications },
-  { id: "talents", name: "Ajouter un service", icon: FileUp, component: NewService }, // NOUVEAU
   { id: "profile", name: "Mon profil", icon: Users, component: UserProfil },     // NOUVEAU
   { id: "messaging", name: "Messagerie", icon: MessageSquare, path: "/messaging/inbox" },
 ];
@@ -139,7 +137,6 @@ export default function UserLayout() {
             {activeTab === "dashboard" && <UserDashboard />}
             {activeTab === "offers" && <OffersAvailable />}
             {activeTab === "applications" && <MyApplications />}
-            {activeTab === "talents" && <NewService />}
             {activeTab === "profile" && <UserProfil />}
             {activeTab === "messaging" && location.pathname.includes("messaging") && <Outlet />}
 

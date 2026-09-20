@@ -30,6 +30,19 @@ export default function VerifyEmail() {
     }
   };
 
+  // Permet de coller le code complet depuis l'email
+  const handlePaste = (e) => {
+    const digits = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!digits) return;
+    e.preventDefault();
+    const newCode = ["", "", "", "", "", ""];
+    digits.split("").forEach((d, i) => {
+      newCode[i] = d;
+    });
+    setCode(newCode);
+    inputsRef.current[Math.min(digits.length, 5)]?.focus();
+  };
+
   const handleKeyDown = (e, index) => {
     if (e.key === "Backspace" && !code[index] && index > 0) {
       inputsRef.current[index - 1].focus();
@@ -134,7 +147,7 @@ export default function VerifyEmail() {
         />
       ))}
 
-      <div className="w-full max-w-2xl mx-auto grid lg:grid-cols-2 gap-8 items-center relative z-10">
+      <div className="w-full max-w-2xl lg:max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10">
 
         {/* Left Side - Informations */}
         <motion.div
@@ -199,7 +212,7 @@ export default function VerifyEmail() {
               {
                 icon: <Clock className="w-6 h-6" />,
                 title: "Code temporaire",
-                description: "Le code est valable pendant 15 minutes pour des raisons de sécurité",
+                description: "Le code est valable pendant 10 minutes pour des raisons de sécurité",
                 gradient: "from-blue-700 to-blue-800"
               }
             ].map((item, idx) => (
@@ -308,18 +321,20 @@ export default function VerifyEmail() {
                   Code de vérification à 6 chiffres
                 </label>
 
-                <div className="flex justify-center gap-3 md:gap-4">
+                <div className="flex justify-center gap-2 md:gap-3 w-full" onPaste={handlePaste}>
                   {code.map((digit, index) => (
                     <motion.input
                       key={index}
                       type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
                       maxLength="1"
                       value={digit}
                       ref={(el) => (inputsRef.current[index] = el)}
                       onChange={(e) => handleChange(e.target.value, index)}
                       onKeyDown={(e) => handleKeyDown(e, index)}
-                      whileFocus={{ scale: 1.1 }}
-                      className="w-14 h-16 md:w-16 md:h-20 text-center text-2xl md:text-3xl font-bold rounded-xl border-2 border-blue-200 bg-white text-gray-900
+                      whileFocus={{ scale: 1.05 }}
+                      className="flex-1 min-w-0 max-w-16 h-14 md:h-16 text-center text-2xl md:text-3xl font-bold rounded-xl border-2 border-blue-200 bg-white text-gray-900
                       focus:border-blue-500 focus:outline-none focus:shadow-lg focus:shadow-blue-200/50 shadow-sm
                       transition-all duration-200"
                       disabled={loading}

@@ -1,5 +1,6 @@
 // src/pages/Jobs/JobsDetails.jsx
 import React, { useState, useEffect } from "react";
+import { escapeHtml } from "../../utils/safeHtml";
 import { useParams, useNavigate } from "react-router-dom";
 import { getJobDetail, getJobApplications, updateApplicationStatus } from "../../services/jobs";
 import {
@@ -115,7 +116,8 @@ export default function JobsDetails() {
   // --- FONCTION DE FORMATAGE ---
   const formatDescription = (content) => {
     if (!content) return "";
-    let formatted = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Échapper le HTML (contenu saisi par l'utilisateur) avant de formater
+    let formatted = escapeHtml(content).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     formatted = formatted.replace(/\*\*/g, '');
 
     // Ajout de classes Tailwind pour le rendu

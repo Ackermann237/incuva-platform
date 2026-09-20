@@ -1,6 +1,6 @@
 // src/pages/Jobs/Entreprises/TechnicalTestsDashboard/HeaderTest.jsx
 import React from 'react';
-import { Plus, FileText, Users, CheckSquare, Brain, BarChart } from 'lucide-react';
+import { Plus, FileText, Users, CheckSquare, BarChart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function HeaderTest({ statistics, onCreateTest }) {
@@ -38,7 +38,7 @@ export default function HeaderTest({ statistics, onCreateTest }) {
 
       {/* Statistiques rapides */}
       {statistics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
@@ -81,21 +81,6 @@ export default function HeaderTest({ statistics, onCreateTest }) {
             </div>
             <div className="mt-4 text-sm text-gray-500">
               {statistics.publicTests} tests publics
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Performance IA</p>
-                <p className="text-3xl font-bold text-gray-900">86%</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Brain className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-            <div className="mt-4 text-sm text-gray-500">
-              Tests générés par IA: 12
             </div>
           </div>
         </div>

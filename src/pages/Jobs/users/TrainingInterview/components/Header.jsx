@@ -10,7 +10,7 @@ export default function Header({ jobDetails, feedback }) {
   return (
     <div className="flex items-center justify-between mb-8">
       <button
-        onClick={() => navigate('/my-applications')}
+        onClick={() => navigate('/jobs/my-applications')}
         className="flex items-center gap-3 px-4 py-2 bg-white text-gray-700 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
       >
         <ArrowLeft className="w-5 h-5" />

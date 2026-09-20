@@ -45,7 +45,7 @@ export default function JobDetailsPanel({ jobDetails, applicationId, navigate })
           {jobDetails.description && (
             <div>
               <p className="text-sm text-gray-700 line-clamp-4">
-                {jobDetails.description.substring(0, 200)}...
+                {jobDetails.description.replace(/\*\*/g, '').substring(0, 200)}...
               </p>
             </div>
           )}

@@ -35,8 +35,11 @@ export async function getEmployeesForPayroll() {
  */
 export async function getPayslips(params = {}) {
   try {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE_URL}/payslips?${queryString}`, {
+    // Les paramètres vides provoquent une redirection qui fait perdre la session : on les retire
+    const queryString = new URLSearchParams(
+      Object.entries(params).filter(([, value]) => value !== '' && value != null)
+    ).toString();
+    const response = await fetch(queryString ? `${API_BASE_URL}/payslips?${queryString}` : `${API_BASE_URL}/payslips`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'
@@ -154,6 +157,24 @@ export async function updatePayslip(payslipId, updateData) {
 /**
  * Approuver un bulletin de paie
  */
+export async function deletePayslip(payslipId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/payslip/${payslipId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Erreur lors de la suppression du bulletin' };
+    }
+    return { success: true, message: data.message };
+  } catch (error) {
+    console.error('Erreur deletePayslip:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function approvePayslip(payslipId) {
   try {
     const response = await fetch(`${API_BASE_URL}/payslip/${payslipId}/approve`, {

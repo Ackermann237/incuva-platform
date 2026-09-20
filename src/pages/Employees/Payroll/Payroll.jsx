@@ -17,7 +17,8 @@ import {
   getPayslips,
   getPayrollStats,
   approvePayslip,
-  markPayslipAsPaid
+  markPayslipAsPaid,
+  deletePayslip
 } from '../../../services/payroll';
 
 export default function Payroll() {
@@ -82,6 +83,17 @@ export default function Payroll() {
   const handleApprovePayslip = async (payslipId) => {
     if (confirm('Êtes-vous sûr de vouloir approuver ce bulletin ?')) {
       const result = await approvePayslip(payslipId);
+      if (result.success) {
+        fetchData();
+      } else {
+        alert(result.error);
+      }
+    }
+  };
+
+  const handleDeletePayslip = async (payslipId) => {
+    if (confirm('Supprimer ce bulletin en brouillon ? Cette action est définitive.')) {
+      const result = await deletePayslip(payslipId);
       if (result.success) {
         fetchData();
       } else {
@@ -352,14 +364,16 @@ export default function Payroll() {
                             </button>
                           )}
 
-                          {/* Bouton Supprimer (optionnel) */}
-                          <button
-                            onClick={() => {/* Navigation vers la suppression */}}
-                            className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {/* Suppression : uniquement pour un bulletin en brouillon */}
+                          {payslip.status === 'draft' && (
+                            <button
+                              onClick={() => handleDeletePayslip(payslip.id)}
+                              className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

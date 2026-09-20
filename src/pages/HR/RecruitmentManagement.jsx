@@ -75,7 +75,7 @@ export default function RecruitmentManagement({ data, loading }) {
             </p>
           </div>
           <button
-            onClick={() => navigate("/create-job")}
+            onClick={() => navigate("/jobs/create")}
             className="px-6 py-3 bg-white text-blue-700 font-semibold rounded-xl hover:bg-blue-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
           >
             <Briefcase className="w-5 h-5" />
@@ -203,7 +203,7 @@ export default function RecruitmentManagement({ data, loading }) {
                 key={job.job_id}
                 onMouseEnter={() => setHoveredJob(job.job_id)}
                 onMouseLeave={() => setHoveredJob(null)}
-                onClick={() => navigate(`/jobs/${job.job_id}`)}
+                onClick={() => navigate(`/jobs/details/${job.job_id}`)}
                 className="p-6 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 cursor-pointer group relative overflow-hidden"
               >
                 {/* Hover effect line */}

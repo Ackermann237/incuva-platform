@@ -199,7 +199,7 @@ export async function getDashboardStats() {
 
 export async function getTalentDetail(talentId) {
   try {
-    const response = await fetch(`/hr/talent_detail/${talentId}`);
+    const response = await fetch(`/api/hr/talent_detail/${talentId}`, { credentials: 'include' });
     const data = await response.json();
     if (!response.ok) return { success: false, error: data.error || "Talent non trouvé" };
     return { success: true, data: data.talent };

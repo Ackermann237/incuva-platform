@@ -20,8 +20,6 @@ export default function PayrollStats({ stats }) {
       value: formatCurrency(stats.total_payroll_cost || 0),
       icon: DollarSign,
       color: "from-blue-500 to-blue-600",
-      change: "+12%",
-      changeColor: "text-green-600",
       bgColor: "bg-blue-50"
     },
     {
@@ -29,8 +27,6 @@ export default function PayrollStats({ stats }) {
       value: formatCurrency(stats.average_salary || 0),
       icon: TrendingUp,
       color: "from-green-500 to-green-600",
-      change: "+5%",
-      changeColor: "text-green-600",
       bgColor: "bg-green-50"
     },
     {
@@ -38,8 +34,6 @@ export default function PayrollStats({ stats }) {
       value: stats.total_payslips || 0,
       icon: BarChart3,
       color: "from-purple-500 to-purple-600",
-      change: "+8%",
-      changeColor: "text-green-600",
       bgColor: "bg-purple-50"
     },
     {
@@ -56,8 +50,6 @@ export default function PayrollStats({ stats }) {
       value: formatCurrency(stats.taxes_total + stats.contributions_total || 0),
       icon: CreditCard,
       color: "from-red-500 to-red-600",
-      change: "-3%",
-      changeColor: "text-green-600",
       bgColor: "bg-red-50"
     },
     {
@@ -65,8 +57,6 @@ export default function PayrollStats({ stats }) {
       value: formatCurrency(stats.this_month_total || 0),
       icon: Calendar,
       color: "from-indigo-500 to-indigo-600",
-      change: "+15%",
-      changeColor: "text-green-600",
       bgColor: "bg-indigo-50"
     }
   ];
@@ -107,9 +97,11 @@ export default function PayrollStats({ stats }) {
                 <div className={`w-10 h-10 bg-gradient-to-br ${stat.color} rounded-lg flex items-center justify-center text-white shadow-md`}>
                   <Icon className="w-5 h-5" />
                 </div>
-                <div className={`text-xs font-bold px-2 py-1 rounded-full ${stat.changeColor.includes('green') ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
-                  {stat.change}
-                </div>
+                {stat.change && (
+                  <div className="text-xs font-bold px-2 py-1 rounded-full bg-orange-100 text-orange-800">
+                    {stat.change}
+                  </div>
+                )}
               </div>
               <h3 className="text-gray-600 text-sm font-medium mb-1">{stat.title}</h3>
               <p className="text-xl font-bold text-gray-900 truncate">{stat.value}</p>

@@ -600,7 +600,7 @@ export default function Inbox() {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @media (max-width: 1024px) {
           .ml-12 { margin-left: 3rem; }
         }

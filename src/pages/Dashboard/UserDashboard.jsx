@@ -63,7 +63,7 @@ export default function UserDashboard() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">
-                  {user?.firstName || user?.name || "Candidat"}
+                  {[user?.first_name || user?.firstName, user?.name].filter(Boolean).join(" ") || "Candidat"}
                 </h2>
                 <p className="text-gray-500">{user.email}</p>
               </div>
@@ -133,7 +133,7 @@ export default function UserDashboard() {
                 <h4 className="font-bold text-lg text-gray-900 group-hover:text-purple-600 transition-colors">
                   {job.title}
                 </h4>
-                <p className="text-gray-600 text-sm mt-2 line-clamp-2">{job.description}</p>
+                <p className="text-gray-600 text-sm mt-2 line-clamp-2">{(job.description || '').replace(/\*\*/g, '')}</p>
                 <div className="flex items-center gap-2 mt-3 text-sm text-gray-500">
                   <MapPin className="w-4 h-4" />
                   <span>{job.location}</span>

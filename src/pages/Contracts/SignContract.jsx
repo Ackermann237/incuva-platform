@@ -1,5 +1,6 @@
 // src/pages/Contracts/SignContract.jsx
 import React, { useEffect, useState, useRef } from "react";
+import { sanitizeHtml } from "../../utils/safeHtml";
 import {
   CheckCircle,
   XCircle,
@@ -540,7 +541,7 @@ export default function SignContract({ contractId, onSuccess, onClose }) {
               <div className="prose prose-sm md:prose-base max-w-none text-gray-800">
                 <div
                   dangerouslySetInnerHTML={{
-                    __html: cleanAndFormatContent(contract.contract?.contract_content)
+                    __html: sanitizeHtml(cleanAndFormatContent(contract.contract?.contract_content))
                   }}
                 />
               </div>
@@ -747,7 +748,7 @@ export default function SignContract({ contractId, onSuccess, onClose }) {
       </div>
 
       {/* Styles supplémentaires */}
-      <style jsx global>{`
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
         }

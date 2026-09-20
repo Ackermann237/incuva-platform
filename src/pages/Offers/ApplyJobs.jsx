@@ -360,7 +360,7 @@ export default function ApplyJob() {
 
             {(!userHasCV || !profileComplete) && (
               <button
-                onClick={() => navigate('/user/profile/edit')}
+                onClick={() => navigate('/profil')}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors"
               >
                 Compléter mon profil

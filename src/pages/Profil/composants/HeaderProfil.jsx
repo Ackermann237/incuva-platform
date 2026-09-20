@@ -6,6 +6,25 @@ const HeaderProfil = ({ profile, isEditing, setIsEditing }) => {
   const initials = `${profile?.first_name?.[0] || ""}${profile?.name?.[0] || ""}`.toUpperCase();
   const roleLabel = profile?.userRole === "job_seeker" ? "Candidat" : "Freelance / Particulier";
 
+  // Complétion calculée à partir du profil réel
+  const completionChecks = [
+    ["une description", !!profile?.bio],
+    ["des compétences", profile?.skills?.length > 0],
+    ["tes langues", profile?.languages?.length > 0],
+    ["ton profil LinkedIn", !!profile?.linkedin],
+    ["ton CV", !!profile?.cvUrl],
+    ["une expérience", profile?.experience?.length > 0],
+    ["une formation", profile?.education?.length > 0],
+    ["ton téléphone", !!profile?.phone],
+  ];
+  const completion = Math.round(
+    (completionChecks.filter(([, done]) => done).length / completionChecks.length) * 100
+  );
+  const missing = completionChecks.filter(([, done]) => !done).map(([label]) => label);
+  const suggestion = missing.length
+    ? `Complète ton profil : ajoute ${missing.slice(0, 2).join(" et ")}.`
+    : "Ton profil est complet, bravo !";
+
   return (
     <div className="relative mb-8 overflow-hidden rounded-3xl bg-white border border-gray-100 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.35)]">
       {/* Background: subtle pattern + blue glow */}
@@ -80,7 +99,7 @@ const HeaderProfil = ({ profile, isEditing, setIsEditing }) => {
                 </span>
                 <span className="text-gray-300">•</span>
                 <span className="text-sm text-gray-500">
-                  Complétion : <span className="font-semibold text-gray-800">82%</span>
+                  Complétion : <span className="font-semibold text-gray-800">{completion}%</span>
                 </span>
               </div>
             </div>
@@ -92,10 +111,13 @@ const HeaderProfil = ({ profile, isEditing, setIsEditing }) => {
             <div className="w-full sm:w-auto rounded-2xl border border-gray-100 bg-white/70 backdrop-blur px-5 py-4 shadow-sm">
               <p className="text-xs uppercase tracking-wider text-gray-500">Suggestion IA</p>
               <p className="mt-1 text-sm text-gray-800">
-                Ajoute 2 compétences pour améliorer ton matching.
+                {suggestion}
               </p>
               <div className="mt-3 h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-                <div className="h-full w-[72%] bg-gradient-to-r from-blue-600 to-sky-400 rounded-full" />
+                <div
+                  className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full"
+                  style={{ width: `${completion}%` }}
+                />
               </div>
             </div>
 

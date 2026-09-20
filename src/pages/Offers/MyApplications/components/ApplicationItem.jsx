@@ -80,11 +80,20 @@ export default function ApplicationItem({ application, navigate }) {
   };
 
   const viewJobDetails = () => {
-    navigate(`/jobs/${application.job_id}`);
+    navigate(`/jobs/details/${application.job_id}`);
   };
 
-  const viewApplicationDetails = () => {
-    navigate(`/applications/${application.application_id}`);
+  // Ouvre la conversation existante avec l'entreprise (sinon la boîte de réception)
+  const contactCompany = async () => {
+    try {
+      const res = await fetch('/api/messaging/inbox', { credentials: 'include' });
+      const data = await res.json();
+      const chat = (data.chats || []).find(c => c.otherParticipantId === application.company_id);
+      navigate(chat ? `/messaging/conversation/${chat.chatId}` : '/messaging/inbox');
+    } catch (err) {
+      console.error('Erreur ouverture conversation:', err);
+      navigate('/messaging/inbox');
+    }
   };
 
   const handleTakeTest = (testId) => {
@@ -134,7 +143,7 @@ export default function ApplicationItem({ application, navigate }) {
           {/* Description */}
           {application.description && (
             <p className="text-gray-700 line-clamp-2 mb-4">
-              {application.description}
+              {application.description.replace(/\*\*/g, '')}
             </p>
           )}
 
@@ -238,7 +247,7 @@ export default function ApplicationItem({ application, navigate }) {
 
           {application.status === 'accepted' && (
             <button
-              onClick={viewApplicationDetails}
+              onClick={contactCompany}
               className="w-full px-4 py-2 bg-purple-100 text-purple-700 rounded-lg font-medium hover:bg-purple-200 transition-colors flex items-center justify-center gap-2"
             >
               <MessageSquare className="w-4 h-4" />

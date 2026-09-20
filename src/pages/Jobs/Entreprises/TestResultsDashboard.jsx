@@ -486,10 +486,10 @@ export default function TestResultsDashboard() {
                             </div>
                             <div>
                               <div className="font-medium text-gray-900">
-                                {attempt.name || 'Candidat anonyme'}
+                                {attempt.candidate_name || attempt.name || 'Candidat anonyme'}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {attempt.email}
+                                {attempt.candidate_email || attempt.email}
                               </div>
                             </div>
                           </div>

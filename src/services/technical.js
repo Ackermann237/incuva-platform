@@ -687,7 +687,7 @@ export function getPromptSuggestions() {
 
 export async function getCompanyJobs() {
   try {
-    const response = await fetch('api/jobs/api/job_list', {
+    const response = await fetch('/api/jobs/api/job_list', {
       credentials: 'include'
     });
 
@@ -720,7 +720,7 @@ export async function getCompanyJobs() {
 export async function getJobDetail(jobId) {
   try {
     // CORRECTION : Même chose ici
-    const response = await fetch(`api/jobs/api/job_detail/${jobId}`, {  // ← Changé ici
+    const response = await fetch(`/api/jobs/api/job_detail/${jobId}`, {  // ← Changé ici
       credentials: 'include'
     });
     const data = await response.json();
@@ -842,7 +842,7 @@ export async function handleTakeTest(testId, navigate, options = {}) {
     }
 
     // Option 2: Naviguer directement
-    navigate(`/api/technical-test/${testId}`, {
+    navigate(`/technical-test/${testId}`, {
       state: {
         testId: testId,
         ...options

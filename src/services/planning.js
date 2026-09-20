@@ -6,8 +6,11 @@ const API_BASE_URL = '/api/planning';
  */
 export async function getPlanning(params = {}) {
   try {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE_URL}?${queryString}`, {
+    // Les paramètres vides (ex. `search=`) provoquent une redirection qui fait perdre la session : on les retire
+    const queryString = new URLSearchParams(
+      Object.entries(params).filter(([, value]) => value !== '' && value != null)
+    ).toString();
+    const response = await fetch(queryString ? `${API_BASE_URL}?${queryString}` : API_BASE_URL, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'

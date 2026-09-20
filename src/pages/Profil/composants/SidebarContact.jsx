@@ -1,6 +1,6 @@
 // frontend/src/pages/profil/composant/SidebarContact.jsx
 import React from 'react';
-import { Mail, Phone, Linkedin, Globe } from 'lucide-react';
+import { Mail, Phone, Linkedin, Globe, MapPin } from 'lucide-react';
 
 const SidebarContact = ({ profile, formData, isEditing, handleChange }) => {
   return (
@@ -15,8 +15,32 @@ const SidebarContact = ({ profile, formData, isEditing, handleChange }) => {
           </div>
           <div className="flex items-center gap-4">
             <Phone className="w-5 h-5 text-purple-600" />
-            <span>{profile?.phone || 'Non renseigné'}</span>
+            {isEditing ? (
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone || ''}
+                onChange={handleChange}
+                placeholder="+33 6 12 34 56 78"
+                className="w-full px-4 py-2 border rounded-xl"
+              />
+            ) : (
+              <span>{profile?.phone || 'Non renseigné'}</span>
+            )}
           </div>
+          {isEditing && (
+            <div className="flex items-center gap-4">
+              <MapPin className="w-5 h-5 text-purple-600" />
+              <input
+                type="text"
+                name="location"
+                value={formData.location || ''}
+                onChange={handleChange}
+                placeholder="Ville (ex. Paris)"
+                className="w-full px-4 py-2 border rounded-xl"
+              />
+            </div>
+          )}
           <div className="flex items-center gap-4">
             <Linkedin className="w-5 h-5 text-purple-600" />
             {isEditing ? (
