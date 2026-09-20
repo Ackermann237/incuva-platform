@@ -1,6 +1,7 @@
 from firebase_admin import firestore
 import logging
 import datetime
+from ..user_utils import display_name
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class ContractService:
             employee_data = {
                 'company_id': company_id,
                 'candidate_id': candidate_id,
-                'candidate_name': contract_data['candidate_name'],
+                'candidate_name': display_name(candidate_info, contract_data['candidate_name']),
                 'position': contract_data['position'],
                 'salary': contract_data['salary'],
                 'contract_type': contract_data['contract_type'],

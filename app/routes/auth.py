@@ -8,6 +8,13 @@ from datetime import datetime, timedelta
 from firebase_admin import auth, firestore
 from wtforms import ValidationError
 import random
+import secrets
+import hmac
+import json
+import ssl
+import urllib.error
+import urllib.parse
+import urllib.request
 import string
 import smtplib
 from email.mime.text import MIMEText
@@ -48,7 +55,68 @@ def send_verification_email(email, code):
 
 
 def generate_verification_code(length=6):
-    return ''.join(random.choices(string.digits, k=length))
+    return ''.join(secrets.choice(string.digits) for _ in range(length))
+
+
+MAX_RESET_ATTEMPTS = 5
+
+
+def email_already_registered(email):
+    """True si un compte Firebase existe déjà avec cet email."""
+    try:
+        auth.get_user_by_email(email)
+        return True
+    except auth.UserNotFoundError:
+        return False
+
+
+def email_taken_response(email):
+    message = f"Un compte existe déjà avec l'adresse {email}. Connectez-vous ou utilisez une autre adresse."
+    return jsonify({'success': False, 'message': message, 'errors': {'email': [message]}}), 409
+
+# Réponses de Firebase signInWithPassword qui signifient « identifiants incorrects »
+BAD_CREDENTIALS_REASONS = {
+    'EMAIL_NOT_FOUND', 'INVALID_PASSWORD', 'INVALID_LOGIN_CREDENTIALS',
+    'INVALID_EMAIL', 'MISSING_PASSWORD', 'USER_DISABLED', 'TOO_MANY_ATTEMPTS_TRY_LATER',
+}
+
+
+def check_password_with_firebase(email, password):
+    """Vérifie le mot de passe via l'API REST Firebase Auth (l'Admin SDK ne sait pas le faire).
+
+    Retourne l'uid si les identifiants sont valides, None s'ils sont incorrects.
+    Lève RuntimeError si la clé API Firebase n'est pas configurée.
+    """
+    api_key = current_app.config.get('FIREBASE_API_KEY') or os.getenv('FIREBASE_API_KEY')
+    if not api_key:
+        raise RuntimeError("FIREBASE_API_KEY non configurée côté backend")
+
+    url = ('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='
+           + urllib.parse.quote(api_key, safe=''))
+    payload = json.dumps({'email': email, 'password': password, 'returnSecureToken': False}).encode()
+    req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+
+    # urllib + ssl s'appuient sur le magasin de certificats du système (sous Windows, celui de l'OS),
+    # contrairement à requests/certifi qui échoue derrière un antivirus ou proxy qui inspecte le HTTPS.
+    # Python 3.13+ active VERIFY_X509_STRICT, que rejettent les certificats racine de ces outils
+    # d'inspection HTTPS ; on ne relâche que ce mode strict, la chaîne et le nom d'hôte restent vérifiés.
+    ctx = ssl.create_default_context()
+    ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+
+    try:
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
+            return json.load(resp).get('localId')
+    except urllib.error.HTTPError as e:
+        if e.code == 400:
+            try:
+                reason = json.load(e).get('error', {}).get('message', '')
+            except ValueError:
+                reason = ''
+            if reason.split(' ')[0] in BAD_CREDENTIALS_REASONS:
+                return None
+            # Autre 400 (clé API invalide, projet mal configuré...) : ce n'est pas la faute de l'utilisateur
+            raise RuntimeError(f"Firebase a refusé la requête de connexion : {reason or e}")
+        raise
 
 
 # Formulaires
@@ -128,7 +196,7 @@ class RegisterCompanyForm(FlaskForm):
         validators=[
             DataRequired(message="Le SIRET est obligatoire"),
             Length(min=14, max=14, message="Le SIRET doit contenir exactement 14 chiffres"),
-            Regexp('^\d{14}$', message="Le SIRET doit contenir uniquement des chiffres")
+            Regexp(r'^\d{14}$', message="Le SIRET doit contenir uniquement des chiffres")
         ]
     )
 
@@ -210,6 +278,9 @@ def register_individual():
     form = RegisterIndividualForm(data=data)
 
     if form.validate():
+        if email_already_registered(form.email.data):
+            return email_taken_response(form.email.data)
+
         # Stocker les données pour vérification ultérieure
         session['register_data'] = {
             'first_name': form.first_name.data,
@@ -262,6 +333,9 @@ def register_company():
     form = RegisterCompanyForm(data=form_data)
 
     if form.validate():
+        if email_already_registered(form.email.data):
+            return email_taken_response(form.email.data)
+
         session['register_data'] = {
             'email': form.email.data,
             'city': form.city.data,
@@ -459,6 +533,13 @@ def verify_email_api():
             'redirect_url': redirect_url
         })
 
+    except auth.EmailAlreadyExistsError:
+        return jsonify({
+            'success': False,
+            'message': f"Un compte existe déjà avec l'adresse {register_data['email']}. "
+                       "Connectez-vous ou utilisez une autre adresse.",
+            'clear_fields': True
+        }), 409
     except Exception as e:
         return jsonify({
             'success': False,
@@ -533,17 +614,24 @@ def check_account_type():
 
 @auth_bp.route('/login', methods=['POST'])
 def login_api():
-    data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')  # vérification mot de passe ici si nécessaire
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip()
+    password = data.get('password') or ''
+    if not email or not password:
+        return jsonify({'success': False, 'message': 'Email et mot de passe requis'}), 400
+
     try:
-        user = auth.get_user_by_email(email)
-        session['uid'] = user.uid
-        user_doc = db.collection('users').document(user.uid).get()
+        uid = check_password_with_firebase(email, password)
+        if not uid:
+            # Même message pour un email inconnu et un mauvais mot de passe
+            return jsonify({'success': False, 'message': 'Email ou mot de passe incorrect'}), 401
+
+        user_doc = db.collection('users').document(uid).get()
         if user_doc.exists:
             account_type = user_doc.to_dict().get('accountType', 'individual')
+            session['uid'] = uid
             session['account_type'] = account_type
-            db.collection('users').document(user.uid).update({'lastLogin': datetime.utcnow()})
+            db.collection('users').document(uid).update({'lastLogin': datetime.utcnow()})
 
             # Redirection selon type
             if account_type == 'individual':
@@ -555,17 +643,16 @@ def login_api():
                 'success': True,
                 'message': 'Connexion réussie',
                 'redirect_url': redirect_url,
-                'uid': user.uid
+                'uid': uid
             })
 
         return jsonify({'success': False, 'message': 'Utilisateur non trouvé'}), 404
-    except auth.UserNotFoundError:
-        return jsonify({'success': False, 'message': 'Email inconnu'}), 404
+    except RuntimeError as e:
+        current_app.logger.error(f"Login impossible : {e}")
+        return jsonify({'success': False, 'message': "Service d'authentification non configuré"}), 503
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
+        current_app.logger.error(f"Erreur login : {e}")
+        return jsonify({'success': False, 'message': 'Erreur serveur. Veuillez réessayer.'}), 500
 
 
 @auth_bp.route('/reset_password', methods=['POST'])
@@ -580,6 +667,8 @@ def reset_password_api():
         session['reset_email'] = email
         session['reset_code'] = reset_code
         session['reset_expiry'] = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+        session['reset_attempts'] = 0
+        session.pop('reset_verified', None)
 
         if send_verification_email(email, f"Code de réinitialisation : {reset_code}"):
             return jsonify({'success': True, 'message': 'Code de réinitialisation envoyé'})
@@ -593,8 +682,8 @@ def reset_password_api():
 
 @auth_bp.route('/verify_reset_code', methods=['POST'])
 def verify_reset_code_api():
-    data = request.get_json()
-    code = data.get('verification_code')
+    data = request.get_json(silent=True) or {}
+    code = str(data.get('verification_code') or '')
 
     if 'reset_email' not in session or 'reset_code' not in session:
         return jsonify({'success': False, 'message': 'Session expirée'}), 400
@@ -603,22 +692,38 @@ def verify_reset_code_api():
     if datetime.utcnow() > expiry:
         return jsonify({'success': False, 'message': 'Code expiré'}), 400
 
-    if code == session['reset_code']:
+    attempts = session.get('reset_attempts', 0)
+    if attempts >= MAX_RESET_ATTEMPTS:
+        return jsonify({'success': False, 'message': 'Trop de tentatives. Demandez un nouveau code.'}), 429
+
+    if hmac.compare_digest(code, session['reset_code']):
         email = session['reset_email']
         # On ne supprime les sessions qu’après la mise à jour du mot de passe
+        session['reset_verified'] = True
         return jsonify({'success': True, 'message': 'Code valide', 'email': email})
-    else:
-        return jsonify({'success': False, 'message': 'Code incorrect'}), 400
+
+    session['reset_attempts'] = attempts + 1
+    return jsonify({'success': False, 'message': 'Code incorrect'}), 400
 
 
 @auth_bp.route('/set_new_password', methods=['POST'])
 def set_new_password_api():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     email = data.get('email')
     password = data.get('password')
 
     if not email or not password:
         return jsonify({'success': False, 'message': 'Email et mot de passe requis'}), 400
+    if len(password) < 6:
+        return jsonify({'success': False, 'message': 'Le mot de passe doit contenir au moins 6 caractères'}), 400
+
+    # Le code de réinitialisation doit avoir été validé pour cet email dans cette session
+    if not session.get('reset_verified') or session.get('reset_email') != email:
+        return jsonify({'success': False, 'message': 'Code de vérification requis'}), 403
+
+    expiry = datetime.fromisoformat(session['reset_expiry'])
+    if datetime.utcnow() > expiry:
+        return jsonify({'success': False, 'message': 'Code expiré'}), 400
 
     try:
         user = auth.get_user_by_email(email)
@@ -628,10 +733,13 @@ def set_new_password_api():
         session.pop('reset_email', None)
         session.pop('reset_code', None)
         session.pop('reset_expiry', None)
+        session.pop('reset_attempts', None)
+        session.pop('reset_verified', None)
 
         return jsonify({'success': True, 'message': 'Mot de passe mis à jour'})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        current_app.logger.error(f"Erreur set_new_password : {e}")
+        return jsonify({'success': False, 'message': 'Erreur serveur. Veuillez réessayer.'}), 500
 
 
 @auth_bp.route('/logout', methods=['POST'])

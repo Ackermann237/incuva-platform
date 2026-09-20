@@ -11,6 +11,7 @@ from functools import wraps
 from .contracts import generate_first_payslip
 from ..ai.payroll_ia import PayrollAIManager
 from ..firebase.init_firebase import db
+from ..query_utils import latest_doc, sort_docs_desc
 from ..ai.manage import get_ai_manager, HFChatClient
 
 logger = logging.getLogger(__name__)
@@ -78,12 +79,11 @@ def get_employees_for_payroll():
 
             # Récupérer le dernier bulletin si existant
             payslip_ref = db.collection('payslips') \
-                .where('employee_id', '==', doc.id) \
-                .order_by('period_end', direction=firestore.Query.DESCENDING) \
-                .limit(1)
+                .where('employee_id', '==', doc.id)
 
             last_payslip = None
-            for payslip in payslip_ref.stream():
+            payslip = latest_doc(payslip_ref, 'period_end')
+            if payslip:
                 last_payslip = payslip.to_dict()
                 last_payslip['id'] = payslip.id
 
@@ -119,20 +119,20 @@ def get_payslips():
         if employee_id and employee_id != 'all':
             query = query.where('employee_id', '==', employee_id)
 
-        if period_start and period_end:
-            query = query.where('period_start', '>=', period_start) \
-                .where('period_end', '<=', period_end)
-
         if status and status != 'all':
             query = query.where('status', '==', status)
 
-        # Trier par période (plus récent en premier)
-        query = query.order_by('period_end', direction=firestore.Query.DESCENDING)
-
+        # Trier par période (plus récent en premier), côté Python : pas d'index composite Firestore requis
         payslips = []
-        for doc in query.stream():
+        for doc in sort_docs_desc(query.stream(), 'period_end'):
             data = doc.to_dict()
             data['id'] = doc.id
+
+            # Filtre de période côté Python (deux filtres d'intervalle sur des champs différents : pas d'index possible)
+            if period_start and period_end and not (
+                    str(data.get('period_start', ''))[:10] >= period_start
+                    and str(data.get('period_end', ''))[:10] <= period_end):
+                continue
 
             # Récupérer les infos de l'employé
             if 'employee_id' in data:
@@ -440,6 +440,31 @@ def approve_payslip(payslip_id):
 
     except Exception as e:
         logger.error(f"Erreur lors de l'approbation du bulletin: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@payroll_bp.route('/payslip/<payslip_id>', methods=['DELETE'])
+@company_required
+def delete_payslip(payslip_id):
+    """Supprimer un bulletin en brouillon (un bulletin approuvé ou payé est conservé)"""
+    try:
+        payslip_ref = db.collection('payslips').document(payslip_id)
+        payslip_doc = payslip_ref.get()
+        if not payslip_doc.exists:
+            return jsonify({'success': False, 'error': 'Bulletin non trouvé'}), 404
+
+        payslip_data = payslip_doc.to_dict()
+        if payslip_data.get('company_id') != session['uid']:
+            return jsonify({'success': False, 'error': 'Accès non autorisé'}), 403
+
+        if payslip_data.get('status') != 'draft':
+            return jsonify({'success': False, 'error': 'Seul un bulletin en brouillon peut être supprimé'}), 400
+
+        payslip_ref.delete()
+        return jsonify({'success': True, 'message': 'Bulletin supprimé'})
+
+    except Exception as e:
+        logger.error(f"Erreur lors de la suppression du bulletin: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -751,7 +776,7 @@ def setup_auto_payroll(employee_id):
             'employee_id': employee_id,
             'company_id': company_id,
             'contract_type': contract_type,
-            'gross_salary': float(salary),
+            'gross_salary': round(float(salary) / 12, 2),  # salaire mensuel (l'employé a un salaire annuel)
             'period_start': period_start,
             'period_end': period_end,
             'payment_date': payment_date,
@@ -797,11 +822,10 @@ def get_all_payslips_for_ai():
 
         # Récupérer tous les bulletins sans filtre
         payslips_ref = db.collection('payslips') \
-            .where('company_id', '==', company_id) \
-            .order_by('period_end', direction=firestore.Query.DESCENDING)
+            .where('company_id', '==', company_id)
 
         payslips = []
-        for doc in payslips_ref.stream():
+        for doc in sort_docs_desc(payslips_ref.stream(), 'period_end'):
             data = doc.to_dict()
             data['id'] = doc.id
 
@@ -842,12 +866,10 @@ def query_payroll_ai():
 
         # Récupérer les bulletins récents pour le contexte
         payslips_ref = db.collection('payslips') \
-            .where('company_id', '==', company_id) \
-            .order_by('period_end', direction=firestore.Query.DESCENDING) \
-            .limit(20)
+            .where('company_id', '==', company_id)
 
         recent_payslips = []
-        for doc in payslips_ref.stream():
+        for doc in sort_docs_desc(payslips_ref.stream(), 'period_end')[:20]:
             data = doc.to_dict()
             data['id'] = doc.id
             recent_payslips.append(data)

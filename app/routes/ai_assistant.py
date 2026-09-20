@@ -285,19 +285,30 @@ def call_huggingface_api(prompt, context):
 # ==========================
 # ⚡ ACTIONS FLASK EXÉCUTABLES PAR L’IA
 # ==========================
+def _unauthorized():
+    return jsonify({"success": False, "error": "Non authentifié"}), 401
+
+
 @ai_assistant_bp.route('/action/view_applications', methods=['GET'])
 def view_applications():
-    """Affiche la liste des candidatures (exemple d’action exécutée)"""
+    """Affiche les candidatures de l'utilisateur connecté (reçues pour une entreprise, envoyées pour un particulier)"""
+    if 'uid' not in session:
+        return _unauthorized()
+
+    field = "company_id" if session.get('account_type') == 'company' else "candidate_id"
     try:
-        applications = [doc.to_dict() for doc in db.collection("applications").stream()]
+        query = db.collection("applications").where(field, "==", session['uid'])
+        applications = [doc.to_dict() for doc in query.stream()]
         return jsonify({"applications": applications, "count": len(applications)})
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des candidatures : {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Erreur serveur"}), 500
 
 @ai_assistant_bp.route('/action/view_providers', methods=['GET'])
 def view_providers():
     """Affiche la liste des prestataires"""
+    if 'uid' not in session:
+        return _unauthorized()
     try:
         providers = [doc.to_dict() for doc in db.collection("providers").stream()]
         return jsonify({"providers": providers, "count": len(providers)})
@@ -308,6 +319,8 @@ def view_providers():
 @ai_assistant_bp.route('/action/view_services', methods=['GET'])
 def view_services():
     """Affiche la liste des services disponibles"""
+    if 'uid' not in session:
+        return _unauthorized()
     try:
         services = [doc.to_dict() for doc in db.collection("services").stream()]
         return jsonify({"services": services, "count": len(services)})
@@ -318,6 +331,8 @@ def view_services():
 @ai_assistant_bp.route('/action/view_jobs', methods=['GET'])
 def view_jobs():
     """Affiche la liste des offres d'emploi"""
+    if 'uid' not in session:
+        return _unauthorized()
     try:
         jobs = [doc.to_dict() for doc in db.collection("jobs").stream()]
         return jsonify({"jobs": jobs, "count": len(jobs)})

@@ -8,8 +8,19 @@ import io
 from docx import Document
 import logging
 import json
+from urllib.parse import urlparse
 
 ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')
+
+
+def is_allowed_cv_url(url):
+    """N'autorise que les CV hébergés sur S3 (évite que le serveur télécharge une URL arbitraire)."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    host = (parsed.hostname or '').lower()
+    return parsed.scheme == 'https' and host.endswith('.amazonaws.com')
 
 
 def extract_text_from_pdf(url):
@@ -265,12 +276,17 @@ def clean_ai_analysis(analysis):
 @ai_bp.route('/analyze-cv', methods=['POST'])
 def analyze_cv():
     """Analyse un CV avec l'IA et extrait les informations."""
+    if 'uid' not in session:
+        return jsonify({'success': False, 'error': 'Non authentifié'}), 401
+
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         cv_url = data.get('cv_url')
 
         if not cv_url:
             return jsonify({'success': False, 'error': 'URL du CV manquante'}), 400
+        if not is_allowed_cv_url(cv_url):
+            return jsonify({'success': False, 'error': 'URL du CV non autorisée'}), 400
 
         # Détecter le type de fichier
         if cv_url.endswith('.pdf'):
@@ -336,6 +352,8 @@ def auto_complete_profile():
 
     if not cv_url:
         return jsonify({'success': False, 'error': 'URL du CV manquante'}), 400
+    if not is_allowed_cv_url(cv_url):
+        return jsonify({'success': False, 'error': 'URL du CV non autorisée'}), 400
 
     try:
         # Extraire le texte du CV

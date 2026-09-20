@@ -1,3 +1,4 @@
+from . import ssl_trust  # noqa: F401  (doit précéder toute bibliothèque réseau : voir ssl_trust.py)
 from flask import Flask, session, request, g
 from flask_wtf import CSRFProtect
 from flask_cors import CORS
@@ -22,12 +23,43 @@ def get_locale():
     return request.accept_languages.best_match(['fr', 'en', 'es', 'de']) or 'fr'
 
 
+def load_secret_key():
+    """SECRET_KEY du .env ; à défaut, une clé aléatoire générée une fois et conservée dans .secret_key.
+
+    Sans persistance, chaque redémarrage du serveur invalidait toutes les sessions (déconnexion des utilisateurs
+    et perte des inscriptions en cours).
+    """
+    key = os.getenv('SECRET_KEY')
+    if key:
+        return key
+
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.secret_key')
+    try:
+        with open(path, encoding='utf-8') as f:
+            key = f.read().strip()
+        if key:
+            return key
+    except OSError:
+        pass
+
+    key = secrets.token_hex(32)
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(key)
+    except OSError:
+        pass  # dossier en lecture seule : clé volatile, comme avant
+    return key
+
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(DevelopmentConfig)
+    # '/planning' et '/planning/' doivent répondre pareil : sinon Flask redirige (308) vers l'URL du backend,
+    # et le navigateur perd la session en suivant la redirection à travers le proxy du frontend.
+    app.url_map.strict_slashes = False
 
     # Ensure a secure SECRET_KEY
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(16))
+    app.config['SECRET_KEY'] = load_secret_key()
     app.config['SESSION_COOKIE_SECURE'] = False  # Set to False for development
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -56,6 +88,9 @@ def create_app():
     # Register blueprints
     from .routes import main, auth, dashboard, hr, messaging, jobs, contracts, users, employees, TrainingInterview, TechnicalTest, planning, absences, payroll, VisioTraining, ai_routes, Conversational
 
+    csrf.exempt(main.main_api_bp)
+    csrf.exempt(users.users_bp)
+    csrf.exempt(employees.employees_bp)
     csrf.exempt(auth.auth_bp)
     csrf.exempt(dashboard.dashboard_bp)
     csrf.exempt(ai_assistant.ai_assistant_bp)

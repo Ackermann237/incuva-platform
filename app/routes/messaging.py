@@ -9,6 +9,7 @@ from firebase_admin import firestore
 import json
 import uuid
 import requests
+from ..user_utils import display_name
 
 logger = logging.getLogger(__name__)
 messaging_bp = Blueprint('messaging', __name__, url_prefix='/messaging', template_folder='templates/messaging')
@@ -49,10 +50,7 @@ def api_conversation(chat_id):
     other_user_doc = g.db.collection('users').document(other_id).get()
     other_data = other_user_doc.to_dict()
 
-    if other_data.get('accountType') == 'company':
-        other_name = other_data.get('companyName') or other_data.get('name', 'Anonyme')
-    else:
-        other_name = other_data.get('name', 'Anonyme')
+    other_name = display_name(other_data)
 
     # Messages
     try:
@@ -63,9 +61,7 @@ def api_conversation(chat_id):
         current_user_doc = g.db.collection('users').document(user_id).get()
         current_user_doc = g.db.collection('users').document(user_id).get()
         current_user_data = current_user_doc.to_dict()
-        current_user_name = current_user_data.get('name', 'Moi')
-        if current_user_data.get('accountType') == 'company':
-            current_user_name = current_user_data.get('companyName') or current_user_name
+        current_user_name = display_name(current_user_data, 'Moi')
         current_account_type = current_user_doc.to_dict().get('accountType',
                                                               'individual') if current_user_doc.exists else 'individual'
         return jsonify({

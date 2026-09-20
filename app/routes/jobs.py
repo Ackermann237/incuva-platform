@@ -7,6 +7,7 @@ import boto3
 from botocore.exceptions import ClientError
 from werkzeug.utils import secure_filename
 from flask import current_app
+from ..user_utils import display_name
 
 
 jobs_bp = Blueprint('jobs', __name__, url_prefix='/jobs')
@@ -468,7 +469,7 @@ def api_get_job_applications(job_id):
             user_doc = g.db.collection('users').document(data['candidate_id']).get()
             if user_doc.exists:
                 user_data = user_doc.to_dict()
-                data['candidate_name'] = f"{user_data.get('firstName', '')} {user_data.get('lastName', '')}".strip()
+                data['candidate_name'] = display_name(user_data, "Utilisateur inconnu")
             else:
                 data['candidate_name'] = "Utilisateur inconnu"
             # Formatage de la date
@@ -575,6 +576,39 @@ def api_my_applications():
                 app['applied_at'] = app['applied_at'].to_datetime().isoformat()
             applications.append(app)
         return jsonify({'success': True, 'applications': applications})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@jobs_bp.route('/api/application/<application_id>', methods=['GET'])
+def api_application_detail(application_id):
+    """Détail d'une candidature (candidat concerné ou entreprise destinataire), avec les infos de l'offre."""
+    if 'uid' not in session:
+        return jsonify({'success': False, 'error': 'Non authentifié'}), 401
+
+    try:
+        doc = g.db.collection('applications').document(application_id).get()
+        if not doc.exists:
+            return jsonify({'success': False, 'error': 'Candidature non trouvée'}), 404
+
+        app = doc.to_dict()
+        if session['uid'] not in (app.get('candidate_id'), app.get('company_id')):
+            return jsonify({'success': False, 'error': 'Accès non autorisé'}), 403
+
+        app['application_id'] = doc.id
+        job_doc = g.db.collection('jobs').document(app['job_id']).get() if app.get('job_id') else None
+        if job_doc and job_doc.exists:
+            job = job_doc.to_dict()
+            app['job_title'] = job.get('title', 'Offre inconnue')
+            app['description'] = job.get('description', '')
+            company_doc = g.db.collection('users').document(job['company_id']).get()
+            app['company_name'] = company_doc.to_dict().get('companyName', 'Entreprise') if company_doc.exists else 'Entreprise'
+
+        for key, value in list(app.items()):
+            if hasattr(value, 'isoformat'):
+                app[key] = value.isoformat()
+
+        return jsonify({'success': True, 'application': app})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

@@ -5,6 +5,7 @@ import datetime
 import logging
 from functools import wraps
 from ..firebase.init_firebase import db
+from ..query_utils import sort_docs_desc
 from ..ai.manage import get_ai_manager
 
 logger = logging.getLogger(__name__)
@@ -43,12 +44,10 @@ def get_absences():
         if absence_type and absence_type != 'all':
             query = query.where('type', '==', absence_type)
 
-        # Trier par date de début (plus récent en premier)
-        query = query.order_by('start_date', direction=firestore.Query.DESCENDING)
-
-        # Exécuter la requête
+        # Exécuter la requête, triée par date de début (plus récent en premier) côté Python
+        # pour ne pas dépendre d'un index composite Firestore
         absences = []
-        for doc in query.stream():
+        for doc in sort_docs_desc(query.stream(), 'start_date'):
             data = doc.to_dict()
             data['id'] = doc.id
 
@@ -326,13 +325,21 @@ def analyze_absences():
         # Récupérer les données d'absences
         absences_ref = db.collection('absences').where('company_id', '==', company_id)
 
-        if 'start_date' in data and 'end_date' in data:
-            absences_ref = absences_ref.where('start_date', '>=', data['start_date']) \
-                .where('start_date', '<=', data['end_date'])
+        range_start = data.get('start_date')
+        range_end = data.get('end_date')
 
         absences_data = []
         for doc in absences_ref.stream():
             absence = doc.to_dict()
+
+            # Filtre de période côté Python : `start_date` est stocké comme date Firestore (pas comme texte) et
+            # un filtre d'intervalle exigerait de toute façon un index composite
+            if range_start and range_end:
+                start = absence.get('start_date')
+                start = start.strftime('%Y-%m-%d') if hasattr(start, 'strftime') else str(start)[:10]
+                if not (range_start <= start <= range_end):
+                    continue
+
             absences_data.append(absence)
 
         # Récupérer le gestionnaire IA

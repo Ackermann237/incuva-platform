@@ -30,17 +30,17 @@ class NLUProcessor:
     def _initialize_models(self):
         """Initialiser les modèles NLP"""
         try:
-            # Charger spaCy pour le français
+            # Charger spaCy pour le français. Sans le modèle (python -m spacy download fr_core_news_md), on
+            # se rabat sur un pipeline vierge : découpage en mots et en phrases, sans reconnaissance d'entités.
             try:
                 self.nlp_fr = spacy.load("fr_core_news_md")
-            except:
-                logger.info("Téléchargement du modèle spaCy français...")
-                import subprocess
-                subprocess.run(["python", "-m", "spacy", "download", "fr_core_news_md"])
-                self.nlp_fr = spacy.load("fr_core_news_md")
+            except Exception:
+                logger.warning("Modèle spaCy fr_core_news_md introuvable : pipeline français simplifié utilisé "
+                               "(installer le modèle pour la reconnaissance d'entités)")
+                self.nlp_fr = spacy.blank("fr")
+                self.nlp_fr.add_pipe("sentencizer")
 
-            # Charger le modèle de similarité sémantique
-            self.sentence_model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+            # Le modèle de similarité sémantique (~470 Mo) n'est chargé qu'au premier besoin : voir _get_sentence_model
 
             # Définir les intentions RH
             self.rh_intents = self._define_rh_intents()
@@ -52,10 +52,13 @@ class NLUProcessor:
             try:
                 nltk.data.find('tokenizers/punkt')
                 nltk.data.find('corpora/stopwords')
-            except:
-                nltk.download('punkt')
-                nltk.download('stopwords')
-                nltk.download('punkt_tab')
+            except Exception:
+                try:
+                    nltk.download('punkt')
+                    nltk.download('stopwords')
+                    nltk.download('punkt_tab')
+                except Exception as e:
+                    logger.warning(f"Ressources NLTK indisponibles : {e}")
 
             logger.info("✅ Modèles NLP initialisés avec succès")
 
@@ -204,10 +207,17 @@ class NLUProcessor:
 
         return entities
 
+    def _get_sentence_model(self):
+        """Charge le modèle de similarité sémantique à la demande (téléchargement d'environ 470 Mo au premier appel)"""
+        if self.sentence_model is None:
+            self.sentence_model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+        return self.sentence_model
+
     def calculate_similarity(self, text1: str, text2: str) -> float:
         """Calculer la similarité sémantique entre deux textes"""
-        embeddings1 = self.sentence_model.encode(text1, convert_to_tensor=True)
-        embeddings2 = self.sentence_model.encode(text2, convert_to_tensor=True)
+        model = self._get_sentence_model()
+        embeddings1 = model.encode(text1, convert_to_tensor=True)
+        embeddings2 = model.encode(text2, convert_to_tensor=True)
 
         cosine_scores = util.pytorch_cos_sim(embeddings1, embeddings2)
         return cosine_scores.item()

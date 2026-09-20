@@ -76,9 +76,6 @@ def get_planning():
         # Construire la requête
         query = db.collection('planning').where('company_id', '==', company_id)
 
-        if start_date and end_date:
-            query = query.where('date', '>=', start_date).where('date', '<=', end_date)
-
         if department and department != 'all':
             query = query.where('department', '==', department)
 
@@ -90,6 +87,11 @@ def get_planning():
         for doc in query.stream():
             data = doc.to_dict()
             data['id'] = doc.id
+
+            # Filtre de période côté Python : un filtre d'intervalle sur `date` combiné aux filtres d'égalité
+            # exige un index composite Firestore (les dates sont des textes AAAA-MM-JJ, donc comparables)
+            if start_date and end_date and not (start_date <= str(data.get('date', ''))[:10] <= end_date):
+                continue
 
             # Récupérer les infos de l'employé
             if 'employee_id' in data:
