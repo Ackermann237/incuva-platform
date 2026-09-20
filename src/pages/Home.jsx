@@ -295,6 +295,20 @@ export default function Home() {
                     {item.charAt(0).toUpperCase() + item.slice(1)}
                   </button>
                 ))}
+                <div className="flex gap-3 pt-4 border-t border-white/10">
+                  <button
+                    onClick={() => navigate("/login")}
+                    className="flex-1 px-5 py-3 text-sm rounded-full text-white border border-white/20 hover:bg-white/10 transition-all"
+                  >
+                    Connexion
+                  </button>
+                  <button
+                    onClick={() => navigate("/select_account_type")}
+                    className="flex-1 px-5 py-3 bg-white text-black rounded-full text-sm font-medium hover:bg-gray-200 transition-all"
+                  >
+                    Démarrer
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -384,13 +398,15 @@ export default function Home() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="px-8 py-4 bg-white text-black rounded-full font-medium hover:bg-gray-200 transition-all"
+              onClick={() => navigate("/select_account_type")}
             >
               Commencer maintenant
             </motion.button>
-            <motion.button 
+            <motion.button
               className="px-8 py-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full font-medium hover:bg-white/10 transition-all flex items-center gap-2 justify-center group"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              onClick={() => scrollToSection("features")}
             >
               <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
               Voir la démo
@@ -1297,8 +1313,9 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-6 justify-center mb-20">
             <motion.button
               whileHover={{ scale: 1.08 }}
+              onClick={() => navigate("/register_company")}
               className="
-                px-12 py-4 bg-white text-black rounded-full 
+                px-12 py-4 bg-white text-black rounded-full
                 font-semibold shadow-xl hover:bg-gray-200 transition-all
               "
             >
@@ -1307,6 +1324,7 @@ export default function Home() {
 
             <motion.button
               whileHover={{ scale: 1.08, backdropFilter: 'blur(30px)' }}
+              onClick={() => navigate("/register_individual")}
               className="
                 px-12 py-4 bg-white/10 border border-white/20 
                 backdrop-blur-2xl rounded-full text-white font-semibold 
