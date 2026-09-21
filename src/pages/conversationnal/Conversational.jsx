@@ -1,557 +1,391 @@
-// src/pages/conversational/Conversational.jsx
-import React, { useState, useRef, useEffect } from 'react';
+// src/pages/conversationnal/Conversational.jsx
+// Jarvis : assistant IA de l'entreprise. Un vrai modèle de langage répond à toute question, avec les données RH
+// de l'entreprise en contexte ; réponses en flux, voix (accueil, dictée, lecture) et orbe Lottie animée.
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Send, Bot, User, Database, Shield,
-  Mic, MicOff, RefreshCw, ChevronLeft,
-  Users, Calendar, Clock, Download,
-  BarChart, PieChart, TrendingUp, AlertTriangle,
-  Brain, Target, Zap, Search, Filter,
-  MessageSquare, Smile
+  Activity, CalendarOff, Wallet, FileText, Scale, Sparkles,
+  Download, Eraser, Volume2, VolumeX,
 } from 'lucide-react';
 
-// Services
 import { getEmployees } from '../../services/employees';
 import { getPlanning } from '../../services/planning';
 import { getAbsences } from '../../services/absence';
-import { processConversationalQuery } from '../../services/conversational';
+import { askJarvis, stripSuggestions } from '../../services/conversational';
+import JarvisOrb from '../../components/lottie/JarvisOrb';
+import MessageBubble from '../../components/jarvis/MessageBubble';
+import Composer from '../../components/jarvis/Composer';
+import TelemetryPanel from '../../components/jarvis/TelemetryPanel';
+import useVoice from '../../hooks/useVoice';
+import '../../components/jarvis/jarvis.css';
+
+// Message d'accueil prononcé quand on arrive dans la section IA
+const GREETING = "Bonjour, je suis Jarvis, votre assistant RH intelligent. Que puis-je faire pour vous ?";
+const VOICE_PREF_KEY = 'jarvis_voice_enabled';
+const MAX_SPOKEN_CHARS = 700; // on ne lit à voix haute que le début des longues réponses
+
+const STARTERS = [
+  { icon: Activity, title: 'Point RH du jour', prompt: 'Fais-moi un point RH complet de mon entreprise à partir de mes données.' },
+  { icon: CalendarOff, title: 'Absences à venir', prompt: 'Qui sera absent prochainement, et quel impact sur le planning ?' },
+  { icon: Wallet, title: 'Masse salariale', prompt: 'Analyse ma masse salariale et signale-moi les points d\'attention.' },
+  { icon: FileText, title: 'Rédiger une offre', prompt: 'Rédige une offre d\'emploi attractive pour un développeur full stack senior en CDI.' },
+  { icon: Scale, title: 'Question juridique', prompt: 'Explique-moi le fonctionnement de la période d\'essai d\'un CDI.' },
+  { icon: Sparkles, title: 'Idées managériales', prompt: 'Donne-moi 5 idées concrètes pour motiver mon équipe cette année.' },
+];
+
+const readVoicePref = () => {
+  try {
+    return localStorage.getItem(VOICE_PREF_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+};
+
+const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+// Titre qui s'écrit lettre par lettre
+function useTypewriter(text, speed = 42) {
+  const [shown, setShown] = useState('');
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setShown(text);
+      return undefined;
+    }
+    let index = 0;
+    const timer = setInterval(() => {
+      index += 1;
+      setShown(text.slice(0, index));
+      if (index >= text.length) clearInterval(timer);
+    }, speed);
+    return () => clearInterval(timer);
+  }, [text, speed]);
+  return shown;
+}
+
+function Hero({ orbState, onMic, canListen, onStarter }) {
+  const title = useTypewriter('Bonjour, je suis Jarvis.');
+  return (
+    <div className="mx-auto flex min-h-full max-w-4xl flex-col items-center justify-center py-2 text-center">
+      <button
+        type="button"
+        onClick={onMic}
+        disabled={!canListen}
+        className="relative rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-default"
+        aria-label="Parler à Jarvis"
+        title={canListen ? 'Cliquez sur l\'orbe pour parler à Jarvis' : 'Micro indisponible sur ce navigateur'}
+      >
+        <div className="jv-orb-halo" />
+        <div className="relative">
+          <JarvisOrb state={orbState} size={176} />
+        </div>
+      </button>
+
+      <p className="jv-mono mt-2 text-[11px] uppercase text-cyan-300">Assistant IA · INCUVA Human Intelligence</p>
+      <h1 className="jv-gradient-text mt-3 min-h-[3rem] text-3xl font-bold sm:text-5xl">
+        {title}
+        <span className="jv-caret" style={{ background: '#a78bfa', boxShadow: '0 0 10px #a78bfa' }} aria-hidden="true" />
+      </h1>
+      <p className="mt-3 max-w-xl text-sm text-slate-300 sm:text-base">
+        Posez-moi n'importe quelle question : je connais vos employés, absences, planning, recrutements et contrats, et je
+        réponds aussi sur le droit du travail, le management ou la rédaction.
+      </p>
+
+      <div className="mt-6 grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {STARTERS.map(({ icon: Icon, title: startTitle, prompt }, index) => (
+          <motion.button
+            key={startTitle}
+            type="button"
+            onClick={() => onStarter(prompt)}
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 + index * 0.07, duration: 0.4 }}
+            className="jv-glass jv-glass-hover group relative rounded-2xl p-3.5 text-left"
+          >
+            <span className="jv-corner jv-corner-tl" />
+            <span className="jv-corner jv-corner-br" />
+            <span className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-400/25 to-violet-500/25 text-cyan-200 transition group-hover:scale-110">
+              <Icon className="h-5 w-5" />
+            </span>
+            <p className="text-sm font-semibold text-white">{startTitle}</p>
+            <p className="mt-1 line-clamp-2 text-xs text-slate-400">{prompt}</p>
+          </motion.button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Conversational() {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      role: 'assistant',
-      content: 'Bonjour ! Je suis Jarvis, votre assistant IA RH intelligent.\n\nJe peux analyser vos données en temps réel pour vous aider à :\n\n📊 Examiner les processus RH\n🔍 Détecter des anomalies\n📈 Analyser les tendances\n💡 Proposer des améliorations\n\nComment puis-je vous aider aujourd\'hui ?',
-      timestamp: new Date().toISOString(),
-      type: 'text'
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [dataSources, setDataSources] = useState({
-    employees: [],
-    planning: [],
-    absences: []
-  });
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [dataSources, setDataSources] = useState({ employees: [], planning: [], absences: [] });
+  const [dataLoading, setDataLoading] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(readVoicePref);
 
-  const messagesEndRef = useRef(null);
+  const abortRef = useRef(null);
+  const scrollRef = useRef(null);
+  const stickToBottom = useRef(true);
+  const sendRef = useRef(null); // dernière version de send (utilisée par le micro)
 
-  useEffect(() => {
-    loadInitialData();
+  const {
+    speak, stopSpeaking, listen, stopListening,
+    speaking, listening, interim, voiceError, clearVoiceError,
+    speechBlocked, canSpeak, canListen,
+  } = useVoice({ lang: 'fr-FR' });
+
+  const loadInitialData = useCallback(async () => {
+    setDataLoading(true);
+    try {
+      const [employeesRes, planningRes, absencesRes] = await Promise.all([getEmployees(), getPlanning(), getAbsences()]);
+      setDataSources({
+        employees: employeesRes?.success ? employeesRes.employees : [],
+        planning: planningRes?.success ? planningRes.planning : [],
+        absences: absencesRes?.success ? absencesRes.absences : [],
+      });
+    } catch (error) {
+      console.error('Erreur chargement données:', error);
+    } finally {
+      setDataLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
+    loadInitialData();
+  }, [loadInitialData]);
+
+  // Jarvis salue à voix haute quand on arrive dans la section
+  useEffect(() => {
+    if (!voiceEnabled) return undefined;
+    const timer = setTimeout(() => speak(GREETING), 700);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Coupe la génération en cours quand on quitte la page
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  // Suit la réponse qui s'écrit, sauf si l'utilisateur a remonté la conversation
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && messages.length > 0 && stickToBottom.current) el.scrollTo({ top: el.scrollHeight });
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 140;
   };
 
-  const loadInitialData = async () => {
-    try {
-      const [employeesRes, planningRes, absencesRes] = await Promise.all([
-        getEmployees(),
-        getPlanning(),
-        getAbsences()
-      ]);
+  // viaVoice : la question a été dictée, Jarvis répond alors aussi à voix haute
+  const send = async (text, viaVoice = false, baseMessages = messages) => {
+    const question = (text || '').trim();
+    if (!question || streaming) return;
 
-      if (employeesRes.success) {
-        setDataSources(prev => ({ ...prev, employees: employeesRes.employees }));
-      }
-      if (planningRes.success) {
-        setDataSources(prev => ({ ...prev, planning: planningRes.planning }));
-      }
-      if (absencesRes.success) {
-        setDataSources(prev => ({ ...prev, absences: absencesRes.absences }));
-      }
-    } catch (error) {
-      console.error('Erreur chargement données:', error);
-    }
-  };
+    const now = new Date().toISOString();
+    const userMessage = { id: newId(), role: 'user', content: question, timestamp: now };
+    const botId = newId();
+    const botMessage = { id: botId, role: 'assistant', content: '', timestamp: now, streaming: true };
+    const history = [...baseMessages.filter((m) => m.content && !m.error), userMessage].map(({ role, content }) => ({ role, content }));
 
-  const formatAssistantMessage = (text) => {
-    // Si le texte contient des sections structurées (comme les analyses RH)
-    if (text.includes('📊') || text.includes('🔍') || text.includes('📈') || text.includes('💡')) {
-      const sections = text.split('\n\n');
-      return sections.map((section, sectionIndex) => {
-        const lines = section.split('\n');
-
-        return (
-          <div key={sectionIndex} className="mb-4 last:mb-0">
-            {lines.map((line, lineIndex) => {
-              // Détection des emojis pour le style
-              const emojiMatch = line.trim().match(/^([📊🔍📈💡⚠️🎯✨🔴🟡🟢🤖🚀⭐🌟✅❌]+)/);
-              if (emojiMatch) {
-                const emoji = emojiMatch[1];
-                const restOfLine = line.slice(emoji.length).trim();
-                return (
-                  <div key={lineIndex} className="flex items-start gap-2 mb-2">
-                    <span className="text-lg">{emoji}</span>
-                    <span className="font-semibold text-blue-700">
-                      {restOfLine}
-                    </span>
-                  </div>
-                );
-              }
-
-              if (line.trim().startsWith('• ') || line.trim().startsWith('- ')) {
-                return (
-                  <div key={lineIndex} className="flex items-start gap-2 ml-4 mb-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
-                    <span className="text-gray-700">{line.substring(2).trim()}</span>
-                  </div>
-                );
-              }
-
-              if (line.trim().match(/^\d+\.\s/)) {
-                return (
-                  <div key={lineIndex} className="flex items-start gap-2 ml-4 mb-1">
-                    <span className="text-blue-600 font-medium mt-0.5 flex-shrink-0">{line.match(/^\d+\./)[0]}</span>
-                    <span className="text-gray-700">{line.substring(line.indexOf('.') + 1).trim()}</span>
-                  </div>
-                );
-              }
-
-              return (
-                <div key={lineIndex} className="text-gray-700 mb-2">
-                  {line}
-                </div>
-              );
-            })}
-          </div>
-        );
-      });
-    }
-
-    // Pour les conversations générales (sans structure particulière)
-    return text.split('\n').map((line, index) => (
-      <div key={index} className="text-gray-700 mb-2 last:mb-0">
-        {line}
-      </div>
-    ));
-  };
-
-  const handleSendMessage = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userMessage = {
-      id: messages.length + 1,
-      role: 'user',
-      content: input,
-      timestamp: new Date().toISOString(),
-      type: 'text'
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    const currentInput = input;
+    stickToBottom.current = true;
+    setMessages([...baseMessages, userMessage, botMessage]);
     setInput('');
-    setIsLoading(true);
+    setStreaming(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const patch = (changes) => setMessages((prev) => prev.map((m) => (m.id === botId ? { ...m, ...changes } : m)));
+    let received = '';
 
     try {
-      // Appeler le service de traitement conversationnel
-      const response = await processConversationalQuery(currentInput, dataSources);
-
-      const assistantMessage = {
-        id: messages.length + 2,
-        role: 'assistant',
-        content: response.content,
-        timestamp: new Date().toISOString(),
-        type: response.type || 'text',
-        analysis: response.analysis,
-        suggestions: response.suggestions,
-        dataPoints: response.dataPoints
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      const { answer, suggestions } = await askJarvis({
+        messages: history,
+        signal: controller.signal,
+        onToken: (token) => {
+          received += token;
+          patch({ content: stripSuggestions(received) });
+        },
+      });
+      patch({ content: answer, suggestions, streaming: false });
+      if (viaVoice && voiceEnabled) speak(answer.slice(0, MAX_SPOKEN_CHARS));
     } catch (error) {
-      console.error('Erreur traitement IA:', error);
-      const errorMessage = {
-        id: messages.length + 2,
-        role: 'assistant',
-        content: 'Désolé, une erreur est survenue lors de l\'analyse. Veuillez réessayer ou poser votre question différemment.',
-        timestamp: new Date().toISOString(),
-        type: 'text',
-        isError: true
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      if (error.name === 'AbortError') {
+        patch({ content: stripSuggestions(received) || 'Réponse interrompue.', streaming: false, interrupted: true });
+      } else {
+        patch({ content: error.message || 'Jarvis est indisponible.', streaming: false, error: true, retryText: question });
+      }
     } finally {
-      setIsLoading(false);
+      setStreaming(false);
+      abortRef.current = null;
     }
   };
+  sendRef.current = send;
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+  const handleRetry = (failed) => {
+    const base = messages.slice(0, -2); // retire la question et la réponse en erreur
+    setMessages(base);
+    send(failed.retryText, false, base);
   };
 
+  const handleStop = () => abortRef.current?.abort();
+
+  const handleNewConversation = () => {
+    abortRef.current?.abort();
+    stopSpeaking();
+    setMessages([]);
+    setInput('');
+  };
+
+  // Micro : on dicte, la phrase est envoyée à la fin, et Jarvis répond à voix haute
   const toggleRecording = () => {
-    setIsRecording(!isRecording);
+    if (listening) stopListening();
+    else listen((spoken) => sendRef.current?.(spoken, true));
   };
 
-  const quickQuestions = [
-    {
-      icon: <MessageSquare className="w-4 h-4" />,
-      label: 'Conversation',
-      query: 'Bonjour, comment ça va ?'
-    },
-    {
-      icon: <AlertTriangle className="w-4 h-4" />,
-      label: 'Détecter anomalies',
-      query: 'Y a-t-il des anomalies dans le processus de recrutement ?'
-    },
-    {
-      icon: <Target className="w-4 h-4" />,
-      label: 'Risque burnout',
-      query: 'Quels employés risquent un burnout ?'
-    },
-    {
-      icon: <TrendingUp className="w-4 h-4" />,
-      label: 'Analyser tendances',
-      query: 'Quelles sont les tendances d\'absentéisme ?'
-    },
-    {
-      icon: <Brain className="w-4 h-4" />,
-      label: 'Optimiser planning',
-      query: 'Comment optimiser le planning de la semaine prochaine ?'
-    },
-  ];
-
-  const dataStats = [
-    {
-      label: 'Employés',
-      value: dataSources.employees.length,
-      active: dataSources.employees.filter(e => e.status === 'active').length,
-      icon: <Users className="w-5 h-5" />,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50'
-    },
-    {
-      label: 'Planning',
-      value: dataSources.planning.length,
-      today: dataSources.planning.filter(s => s.date === new Date().toISOString().split('T')[0]).length,
-      icon: <Calendar className="w-5 h-5" />,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50'
-    },
-    {
-      label: 'Absences',
-      value: dataSources.absences.length,
-      pending: dataSources.absences.filter(a => a.status === 'pending').length,
-      icon: <Clock className="w-5 h-5" />,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50'
+  const toggleVoice = () => {
+    const next = !voiceEnabled;
+    setVoiceEnabled(next);
+    try {
+      localStorage.setItem(VOICE_PREF_KEY, String(next));
+    } catch {
+      /* préférence non mémorisée : sans conséquence */
     }
-  ];
-
-  const handleQuestionClick = (query) => {
-    setInput(query);
-    // Focus sur le textarea
-    setTimeout(() => {
-      document.querySelector('textarea')?.focus();
-    }, 100);
+    if (next) speak(GREETING);
+    else stopSpeaking();
   };
+
+  const exportConversation = () => {
+    const text = messages
+      .filter((m) => m.content)
+      .map((m) => `${m.role === 'user' ? 'Vous' : 'Jarvis'} (${new Date(m.timestamp).toLocaleString('fr-FR')}) :\n${m.content}\n`)
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `conversation-jarvis-${new Date().toISOString().split('T')[0]}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Etat de l'orbe et texte d'état
+  const orbState = listening ? 'listening' : speaking ? 'speaking' : streaming ? 'thinking' : 'idle';
+  const statusText = {
+    listening: interim ? `« ${interim} »` : 'Je vous écoute...',
+    speaking: 'Jarvis vous parle...',
+    thinking: 'Jarvis analyse votre demande...',
+    idle: canListen ? 'Prêt. Cliquez sur l\'orbe pour me parler.' : 'Prêt. Posez votre question ci-dessous.',
+  }[orbState];
+
+  const todayKey = new Date().toISOString().split('T')[0];
+  const stats = {
+    employees: dataSources.employees.length,
+    activeEmployees: dataSources.employees.filter((e) => e.status === 'active').length,
+    shifts: dataSources.planning.length,
+    todayShifts: dataSources.planning.filter((s) => s.date === todayKey).length,
+    absences: dataSources.absences.length,
+    pendingAbsences: dataSources.absences.filter((a) => a.status === 'pending').length,
+  };
+
+  const hasConversation = messages.length > 0;
+  const lastMessage = messages[messages.length - 1];
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-blue-50 to-gray-50">
-      {/* Chat Principal */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="bg-white border-b border-blue-100 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-md">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="font-bold text-gray-900">Jarvis Assistant IA</h1>
-                <p className="text-sm text-blue-600">Assistant RH intelligent & conversationnel</p>
-              </div>
+    <div className="jv-root flex h-screen min-h-[620px] w-full">
+      <div className="jv-grid" />
+      <div className="jv-scan" />
+
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+        {/* Barre supérieure */}
+        <header className="flex items-center justify-between gap-3 border-b border-white/10 bg-black/20 px-4 py-3 backdrop-blur-md sm:px-8">
+          <div className="flex items-center gap-3">
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-violet-500 shadow-[0_0_22px_rgba(34,211,238,0.5)]">
+              <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <div className="flex items-center gap-2">
+            <div>
+              <h2 className="jv-mono text-sm font-bold uppercase tracking-[0.25em] text-white">J.A.R.V.I.S</h2>
+              <p className="flex items-center gap-2 text-[11px] text-slate-400">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                En ligne · Llama 3.1 · données RH en direct
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {canSpeak && (
               <button
-                onClick={loadInitialData}
-                className="p-2 hover:bg-blue-50 rounded-lg transition-colors text-blue-600"
-                title="Actualiser les données"
+                type="button"
+                onClick={toggleVoice}
+                className="rounded-lg p-2 text-cyan-200 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                aria-label={voiceEnabled ? 'Désactiver la voix de Jarvis' : 'Activer la voix de Jarvis'}
+                title={voiceEnabled ? 'Voix de Jarvis activée (accueil et réponses aux questions dictées)' : 'Voix de Jarvis désactivée'}
               >
-                <RefreshCw className="w-4 h-4" />
+                {voiceEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
               </button>
-              <div className="flex items-center gap-2 text-sm text-blue-600">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span>IA Active</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-6">
-          <div className="max-w-3xl mx-auto space-y-6">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
-              >
-                {/* Avatar */}
-                <div className="flex-shrink-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-sm ${
-                    message.role === 'user' 
-                      ? 'bg-gradient-to-br from-blue-600 to-blue-700' 
-                      : 'bg-gradient-to-br from-blue-500 to-blue-600'
-                  }`}>
-                    {message.role === 'user' ? (
-                      <User className="w-4 h-4 text-white" />
-                    ) : (
-                      <Bot className="w-4 h-4 text-white" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Message */}
-                <div className={`flex-1 ${message.role === 'user' ? '' : ''}`}>
-                  <div className="inline-block max-w-full">
-                    <div className={`rounded-2xl px-5 py-4 shadow-sm ${
-                      message.role === 'user'
-                        ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
-                        : 'bg-white border border-blue-100'
-                    } ${message.isError ? 'border-red-200 bg-red-50' : ''}`}>
-                      <div className="text-sm leading-relaxed">
-                        {message.role === 'user'
-                          ? message.content.split('\n').map((line, idx) => (
-                              <div key={idx} className="text-white/95">{line}</div>
-                            ))
-                          : formatAssistantMessage(message.content)
-                        }
-                      </div>
-                    </div>
-                    <div className={`mt-1 text-xs ${message.role === 'user' ? 'text-blue-600' : 'text-blue-500'}`}>
-                      {new Date(message.timestamp).toLocaleTimeString('fr-FR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {isLoading && (
-              <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
-                  <Bot className="w-4 h-4 text-white" />
-                </div>
-                <div className="bg-white border border-blue-100 rounded-2xl px-5 py-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-150"></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-300"></div>
-                    <span className="text-sm text-blue-600 ml-2">Jarvis réfléchit...</span>
-                  </div>
-                </div>
-              </div>
             )}
-
-            <div ref={messagesEndRef} />
+            <button
+              type="button"
+              onClick={exportConversation}
+              disabled={!hasConversation}
+              className="rounded-lg p-2 text-slate-300 transition hover:bg-white/10 hover:text-cyan-200 disabled:opacity-30"
+              aria-label="Exporter la conversation"
+              title="Exporter la conversation"
+            >
+              <Download className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleNewConversation}
+              disabled={!hasConversation}
+              className="jv-glass jv-glass-hover ml-1 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-cyan-100 disabled:opacity-30"
+            >
+              <Eraser className="h-4 w-4" /> Nouvelle conversation
+            </button>
           </div>
-        </div>
+        </header>
 
-        {/* Zone de saisie */}
-        <div className="border-t border-blue-100 bg-white/80 backdrop-blur-sm p-4">
-          <div className="max-w-3xl mx-auto">
-            {/* Questions rapides */}
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-              {quickQuestions.map((question, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleQuestionClick(question.query)}
-                  className="flex items-center gap-2 px-3 py-2 bg-white border border-blue-200 hover:border-blue-300 hover:bg-blue-50 rounded-lg text-sm text-blue-700 transition-colors whitespace-nowrap shadow-sm"
-                >
-                  {question.icon}
-                  {question.label}
-                </button>
-              ))}
+        {/* Conversation */}
+        <div ref={scrollRef} onScroll={handleScroll} className="jv-scroll flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+          {hasConversation ? (
+            <div className="mx-auto max-w-4xl space-y-6">
+              <AnimatePresence initial={false}>
+                {messages.map((message) => (
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    showSuggestions={message === lastMessage}
+                    onSuggestion={(suggestion) => send(suggestion)}
+                    onRetry={handleRetry}
+                  />
+                ))}
+              </AnimatePresence>
             </div>
-
-            {/* Input principal */}
-            <div className="relative">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Parlez-moi comme à un ami ou posez une question RH (ex: 'Bonjour !' ou 'Analyse les risques de burnout')..."
-                className="w-full p-4 pr-28 border-2 border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 rounded-xl focus:outline-none resize-none bg-white text-gray-900 placeholder-blue-400 shadow-sm"
-                rows="3"
-                disabled={isLoading}
-              />
-
-              {/* Boutons d'action */}
-              <div className="absolute right-3 bottom-3 flex items-center gap-2">
-                <button
-                  onClick={toggleRecording}
-                  className={`p-2 rounded-lg transition-colors ${
-                    isRecording 
-                      ? 'bg-red-100 text-red-600 border border-red-200' 
-                      : 'hover:bg-blue-100 text-blue-600 border border-blue-200'
-                  }`}
-                  title={isRecording ? "Arrêter l'enregistrement" : "Enregistrement vocal"}
-                >
-                  {isRecording ? (
-                    <MicOff className="w-5 h-5" />
-                  ) : (
-                    <Mic className="w-5 h-5" />
-                  )}
-                </button>
-
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!input.trim() || isLoading}
-                  className={`px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 ${
-                    !input.trim() || isLoading
-                      ? 'bg-blue-200 text-blue-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
-                  }`}
-                >
-                  <Send className="w-4 h-4" />
-                  {isLoading ? '...' : 'Envoyer'}
-                </button>
-              </div>
-            </div>
-
-            {/* Indicateurs */}
-            <div className="mt-3 flex items-center justify-between text-xs text-blue-500">
-              <div className="flex items-center gap-2">
-                <Shield className="w-3 h-3" />
-                <span>Conversation sécurisée</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Zap className="w-3 h-3" />
-                <span>Llama 3.1</span>
-                <kbd className="px-2 py-1 bg-blue-100 text-blue-700 rounded border border-blue-200">Enter</kbd>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Sidebar à droite */}
-      <div className={`flex flex-col ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white border-l border-blue-100 shadow-lg`}>
-        {/* Header sidebar */}
-        <div className="p-4 border-b border-blue-100">
-          <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="flex items-center justify-between w-full group"
-          >
-            {!isSidebarCollapsed ? (
-              <>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-sm">
-                    <Database className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Données RH</h3>
-                    <p className="text-xs text-blue-600">Connecté en direct</p>
-                  </div>
-                </div>
-                <ChevronLeft className="w-4 h-4 text-blue-400 group-hover:text-blue-600" />
-              </>
-            ) : (
-              <Database className="w-6 h-6 text-blue-600" />
-            )}
-          </button>
-        </div>
-
-        {/* Statistiques */}
-        {!isSidebarCollapsed && (
-          <div className="p-4 space-y-4">
-            {dataStats.map((stat, index) => (
-              <div key={index} className={`rounded-xl p-4 border ${stat.bgColor} border-blue-200`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className={`p-2 rounded-lg bg-white shadow-sm ${stat.color}`}>
-                      {stat.icon}
-                    </div>
-                    <span className="font-medium text-gray-900">{stat.label}</span>
-                  </div>
-                  <span className="text-2xl font-bold text-blue-800">{stat.value}</span>
-                </div>
-                <div className="text-sm text-blue-600">
-                  {stat.active && `${stat.active} actifs`}
-                  {stat.today && `${stat.today} aujourd'hui`}
-                  {stat.pending && `${stat.pending} en attente`}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Types de conversations */}
-        <div className="p-4 border-t border-blue-100">
-          {!isSidebarCollapsed && (
-            <div className="flex items-center gap-2 mb-3">
-              <MessageSquare className="w-4 h-4 text-blue-600" />
-              <h4 className="text-sm font-medium text-gray-900">Conversation</h4>
-            </div>
+          ) : (
+            <Hero orbState={orbState} onMic={toggleRecording} canListen={canListen} onStarter={(prompt) => send(prompt)} />
           )}
-          <div className="space-y-2">
-            {[
-              {
-                icon: <Smile className="w-4 h-4" />,
-                label: 'Conversation générale',
-                action: () => handleQuestionClick('Bonjour ! Comment vas-tu aujourd\'hui ?')
-              },
-              {
-                icon: <Brain className="w-4 h-4" />,
-                label: 'Questions RH',
-                action: () => handleQuestionClick('Peux-tu m\'expliquer les lois RH récentes ?')
-              },
-              {
-                icon: <BarChart className="w-4 h-4" />,
-                label: 'Analyse données',
-                action: () => handleQuestionClick('Analyse mes données RH actuelles')
-              }
-            ].map((item, index) => (
-              <button
-                key={index}
-                onClick={item.action}
-                className={`flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-start p-3'} w-full rounded-lg hover:bg-blue-50 text-blue-700 transition-colors border border-transparent hover:border-blue-200`}
-              >
-                {item.icon}
-                {!isSidebarCollapsed && (
-                  <span className="ml-3 text-sm">{item.label}</span>
-                )}
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* Export */}
-        <div className="mt-auto p-4 border-t border-blue-100">
-          <button
-            onClick={() => {
-              const conversationText = messages.map(msg =>
-                `${msg.role === 'user' ? 'Vous' : 'Jarvis'} (${new Date(msg.timestamp).toLocaleString('fr-FR')}):\n${msg.content}\n\n`
-              ).join('');
-
-              const blob = new Blob([conversationText], { type: 'text/plain' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `conversation-jarvis-${new Date().toISOString().split('T')[0]}.txt`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-            className={`flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-start p-3'} w-full rounded-lg hover:bg-blue-50 text-blue-700 transition-colors border border-blue-200 hover:border-blue-300`}
-          >
-            <Download className="w-5 h-5" />
-            {!isSidebarCollapsed && (
-              <span className="ml-3 text-sm">Exporter la conversation</span>
-            )}
-          </button>
-        </div>
+        <Composer
+          value={input}
+          onChange={setInput}
+          onSend={() => send(input)}
+          onStop={handleStop}
+          streaming={streaming}
+          showStrip={hasConversation}
+          orbState={orbState}
+          statusText={statusText}
+          onMic={toggleRecording}
+          listening={listening}
+          canListen={canListen}
+          voiceError={voiceError}
+          onClearVoiceError={clearVoiceError}
+          speechBlocked={speechBlocked}
+          voiceEnabled={voiceEnabled}
+          onReplayGreeting={() => speak(GREETING)}
+        />
       </div>
+
+      <TelemetryPanel stats={stats} loading={dataLoading} onRefresh={loadInitialData} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} />
     </div>
   );
 }

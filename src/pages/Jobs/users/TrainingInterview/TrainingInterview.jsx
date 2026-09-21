@@ -82,7 +82,7 @@ const loadJobFullDetails = async (jobId) => {
 
       // Si pas dans state → charger depuis l'API
       if (!application && applicationId) {
-        const res = await fetch(`/api/applications/${applicationId}`);
+        const res = await fetch(`/api/jobs/api/application/${applicationId}`, { credentials: 'include' });
         const data = await res.json();
         if (data.success) {
           application = data.application;
@@ -328,7 +328,7 @@ const loadJobFullDetails = async (jobId) => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
         <div className="max-w-4xl mx-auto">
           <button
-            onClick={() => navigate('/my-applications')}
+            onClick={() => navigate('/jobs/my-applications')}
             className="flex items-center gap-2 text-gray-600 hover:text-blue-600 mb-6"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -339,7 +339,7 @@ const loadJobFullDetails = async (jobId) => {
             <h3 className="text-xl font-bold text-gray-900 mb-2">Erreur</h3>
             <p className="text-gray-600 mb-6">{error}</p>
             <button
-              onClick={() => navigate('/my-applications')}
+              onClick={() => navigate('/jobs/my-applications')}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Retour aux candidatures

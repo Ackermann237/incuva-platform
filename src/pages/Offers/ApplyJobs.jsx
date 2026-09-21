@@ -1,5 +1,6 @@
 // src/pages/Jobs/ApplyJob.jsx
 import React, { useState, useEffect, useMemo } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Briefcase, MapPin, DollarSign, Upload, CheckCircle,
@@ -273,10 +274,7 @@ export default function ApplyJob() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600 font-medium">Chargement de l'offre...</p>
-        </div>
+        <LottieLoader label="Chargement de l'offre..." />
       </div>
     );
   }
@@ -360,7 +358,7 @@ export default function ApplyJob() {
 
             {(!userHasCV || !profileComplete) && (
               <button
-                onClick={() => navigate('/user/profile/edit')}
+                onClick={() => navigate('/profil')}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors"
               >
                 Compléter mon profil

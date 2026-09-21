@@ -1,5 +1,6 @@
 // src/pages/contracts/allContracts.jsx
 import React, { useEffect, useState } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { useNavigate } from "react-router-dom";
 import {
   FileCheck,
@@ -203,13 +204,7 @@ export default function AllContracts() {
       {/* Tableau des contrats */}
       <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
         {loading ? (
-          <div className="p-16 text-center">
-            <div className="relative w-20 h-20 mx-auto">
-              <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-            <p className="mt-6 text-gray-600 font-medium text-lg">Chargement des contrats...</p>
-          </div>
+          <LottieLoader label="Chargement des contrats..." size={120} />
         ) : contracts.length === 0 ? (
           <div className="p-16 text-center">
             <div className="inline-block p-6 bg-gray-50 rounded-3xl mb-6">

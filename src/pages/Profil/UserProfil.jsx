@@ -2,8 +2,10 @@
 
 // 1. IMPORTS DES COMPOSANTS
 import React, { useState, useEffect, useRef } from 'react';
-import { getProfile, updateProfile, getPresignedCvUrl, uploadCvToS3 } from '../../services/auth';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { getProfile, updateProfile, getPresignedCvUrl, getPresignedPortfolioUrl, uploadCvToS3 } from '../../services/auth';
 import { Check, AlertCircle, Upload, X } from 'lucide-react';
+import LottieLoader from '../../components/lottie/LottieLoader';
 
 // Composants du profil
 import HeaderProfil from './composants/HeaderProfil';
@@ -28,6 +30,9 @@ const UserProfil = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const cvInputRef = useRef(null);
+  const topRef = useRef(null);
+  const location = useLocation();
+  const navigate = useNavigate();
   // portfolioFileInputRef n'est plus nécessaire ici car la ref n'était pas utilisée dans le parent
   const [uploadingCv, setUploadingCv] = useState(false);
   const [portfolioImageUpload, setPortfolioImageUpload] = useState({});
@@ -35,6 +40,15 @@ const UserProfil = () => {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  // Le tableau de bord ouvre directement le profil en mode modification (state.edit)
+  useEffect(() => {
+    if (location.state?.edit) {
+      setIsEditing(true);
+      // On consomme l'indication : un retour ultérieur sur « Mon profil » n'ouvre pas à nouveau le mode modification
+      navigate(location.pathname, { replace: true, state: { ...location.state, edit: false } });
+    }
+  }, [location.state]);
 
   // --- LOGIQUE DE FETCHING ---
   const fetchProfile = async () => {
@@ -94,21 +108,51 @@ const UserProfil = () => {
     setFormData({ ...formData, [field]: formData[field].filter((_, i) => i !== index) });
   };
 
-  const handlePortfolioFileUpload = (file, index) => {
+  // Vrai dépôt d'un fichier de portfolio (image ou PDF) : URL signée, envoi direct au stockage, puis lien enregistré
+  // dans la réalisation ; il est sauvegardé avec le reste du profil au clic sur « Sauvegarder ».
+  const handlePortfolioFileUpload = async (file, index) => {
     if (!file) return;
 
-    // Simuler l'upload et la mise à jour (logique existante)
-    setPortfolioImageUpload({ ...portfolioImageUpload, [index]: true });
-    const simulatedUpload = setTimeout(() => {
-        const fakeUrl = `https://fake-s3-bucket/portfolio/item-${index}-${file.name}`;
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (!allowed.includes(file.type)) {
+      setError('Format non supporté pour le portfolio. Utilisez JPG, PNG, GIF, WEBP ou PDF.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Fichier trop volumineux (max 10 Mo).');
+      return;
+    }
 
-        const updatedPortfolio = [...formData.portfolio];
-        updatedPortfolio[index].fileUrl = fakeUrl;
-        updatedPortfolio[index].fileName = file.name;
+    setError('');
+    setSuccess('');
+    setPortfolioImageUpload((prev) => ({ ...prev, [index]: true }));
 
-        setFormData({ ...formData, portfolio: updatedPortfolio });
-        setPortfolioImageUpload({ ...portfolioImageUpload, [index]: false });
-    }, 1500);
+    try {
+      const presigned = await getPresignedPortfolioUrl(file.name, file.type);
+      if (!presigned.success) throw new Error(presigned.error || "Échec de la préparation de l'envoi");
+
+      const fileUrl = await uploadCvToS3(presigned, file); // simple PUT du fichier vers l'URL signée
+
+      setFormData((prev) => {
+        const portfolio = [...(prev.portfolio || [])];
+        portfolio[index] = { ...portfolio[index], fileUrl, fileName: file.name, fileType: file.type };
+        return { ...prev, portfolio };
+      });
+      setSuccess('Fichier envoyé. Cliquez sur « Sauvegarder toutes les modifications » pour finaliser.');
+    } catch (err) {
+      console.error('Erreur d\'upload portfolio:', err);
+      setError(err.message?.startsWith('Format') ? err.message : "Échec de l'envoi du fichier. Réessayez.");
+    } finally {
+      setPortfolioImageUpload((prev) => ({ ...prev, [index]: false }));
+    }
+  };
+
+  const handlePortfolioFileRemove = (index) => {
+    setFormData((prev) => {
+      const portfolio = [...(prev.portfolio || [])];
+      portfolio[index] = { ...portfolio[index], fileUrl: '', fileName: '', fileType: '' };
+      return { ...prev, portfolio };
+    });
   };
 
   const handleCVUpload = async (e) => {
@@ -163,14 +207,61 @@ const UserProfil = () => {
       }
     };
 
+  // Repart des données enregistrées : les modifications abandonnées ne reviennent pas à la prochaine ouverture
+  const resetForm = (source = profile) => ({
+    ...source,
+    skills: (source.skills || []).join(', '),
+    languages: (source.languages || []).join(', '),
+  });
+
+  const startEditing = () => {
+    setError('');
+    setSuccess('');
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    if (profile) setFormData(resetForm());
+    setError('');
+    setIsEditing(false);
+  };
+
+  const showProblem = (message) => {
+    setError(message);
+    topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSaving(true);
     setError('');
     setSuccess('');
 
+    // Contrôles avant envoi
+    if (!(formData.first_name || '').trim() || !(formData.name || '').trim()) {
+      showProblem('Le prénom et le nom sont obligatoires.');
+      return;
+    }
+    const linkedin = (formData.linkedin || '').trim();
+    if (linkedin && !/^https?:\/\/\S+$/i.test(linkedin)) {
+      showProblem("L'adresse LinkedIn doit commencer par https:// (ex. https://linkedin.com/in/votre-nom).");
+      return;
+    }
+
+    setSaving(true);
+
     try {
       const dataToSend = { ...formData };
+      dataToSend.first_name = dataToSend.first_name.trim();
+      dataToSend.name = dataToSend.name.trim();
+      dataToSend.linkedin = linkedin;
+
+      // Les blocs laissés vides (bouton « Ajouter » cliqué sans rien saisir) ne sont pas enregistrés
+      const cleanItems = (items, keys) =>
+        (items || [])
+          .map((item) => Object.fromEntries(Object.entries(item).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])))
+          .filter((item) => keys.some((k) => item[k]));
+      dataToSend.experience = cleanItems(dataToSend.experience, ['title', 'company']);
+      dataToSend.education = cleanItems(dataToSend.education, ['degree', 'school']);
 
       // Conversion String → Array (pour le backend)
       dataToSend.skills = (dataToSend.skills || '')
@@ -190,12 +281,13 @@ const UserProfil = () => {
 
         setIsEditing(false);
         setSuccess("Profil mis à jour avec succès !");
+        topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         setTimeout(() => setSuccess(''), 5000);
       } else {
-        setError(res.error || "Erreur lors de la sauvegarde");
+        showProblem(res.error || "Erreur lors de la sauvegarde");
       }
     } catch (err) {
-      setError("Erreur serveur. Réessayez.");
+      showProblem("Erreur serveur. Réessayez.");
     } finally {
       setSaving(false);
     }
@@ -203,9 +295,7 @@ const UserProfil = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
+      <LottieLoader label="Chargement de votre profil..." fullScreen />
     );
   }
 
@@ -214,11 +304,15 @@ const UserProfil = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 py-8 px-4">
       <div className="max-w-6xl mx-auto">
 
+        <div ref={topRef} className="scroll-mt-24" />
+
         {/* HEADER */}
         <HeaderProfil
           profile={profile}
           isEditing={isEditing}
-          setIsEditing={setIsEditing}
+          setIsEditing={(value) => (value ? startEditing() : cancelEditing())}
+          formData={formData}
+          handleChange={handleChange}
         />
 
         {/* MESSAGES */}
@@ -244,6 +338,7 @@ const UserProfil = () => {
               formData={formData}
               isEditing={isEditing}
               handleChange={handleChange}
+              onStartEdit={startEditing}
             />
 
             <SectionCompetences
@@ -251,6 +346,7 @@ const UserProfil = () => {
               formData={formData}
               isEditing={isEditing}
               handleChange={handleChange}
+              onStartEdit={startEditing}
             />
 
             <SectionPortfolio
@@ -261,7 +357,9 @@ const UserProfil = () => {
               addItem={addItem}
               removeItem={removeItem}
               handlePortfolioFileUpload={handlePortfolioFileUpload}
+              handlePortfolioFileRemove={handlePortfolioFileRemove}
               portfolioImageUpload={portfolioImageUpload}
+              onStartEdit={() => { startEditing(); addItem('portfolio', { title: '', link: '', fileUrl: '', fileName: '' }); }}
             />
 
             <SectionExperience
@@ -271,6 +369,7 @@ const UserProfil = () => {
               handleArrayChange={handleArrayChange}
               addItem={addItem}
               removeItem={removeItem}
+              onStartEdit={() => { startEditing(); addItem('experience', { title: '', company: '', start: '', end: '', description: '' }); }}
             />
 
             <SectionFormation
@@ -280,6 +379,7 @@ const UserProfil = () => {
               handleArrayChange={handleArrayChange}
               addItem={addItem}
               removeItem={removeItem}
+              onStartEdit={() => { startEditing(); addItem('education', { degree: '', school: '', start: '', end: '' }); }}
             />
 
             <SectionCV
@@ -310,6 +410,7 @@ const UserProfil = () => {
               formData={formData}
               isEditing={isEditing}
               handleChange={handleChange}
+              onStartEdit={startEditing}
             />
           </div>
         </div>

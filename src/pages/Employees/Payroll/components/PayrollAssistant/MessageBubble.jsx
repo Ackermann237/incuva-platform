@@ -1,6 +1,7 @@
 // src/pages/Employees/Payroll/components/PayrollAssistant/MessageBubble.jsx
 import React from 'react';
 import { Bot, User } from 'lucide-react';
+import LightMarkdown from './LightMarkdown';
 
 export default function MessageBubble({ message }) {
   const isUser = message.type === 'user';
@@ -24,9 +25,13 @@ export default function MessageBubble({ message }) {
               : 'bg-gray-100 text-gray-900 rounded-bl-none'
           }`}
         >
-          <div className="whitespace-pre-wrap text-sm">
-            {message.content}
-          </div>
+          {isUser || isError ? (
+            <div className="whitespace-pre-wrap text-sm">{message.content}</div>
+          ) : (
+            <div className="text-sm leading-relaxed">
+              <LightMarkdown>{message.content}</LightMarkdown>
+            </div>
+          )}
         </div>
         <div className="text-xs text-gray-500 mt-1 px-1">
           {message.timestamp.toLocaleTimeString('fr-FR', {

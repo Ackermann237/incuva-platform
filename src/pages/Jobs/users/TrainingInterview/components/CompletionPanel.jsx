@@ -16,7 +16,7 @@ export default function CompletionPanel({ navigate }) {
         </p>
         <div className="flex gap-3 justify-center">
           <button
-            onClick={() => navigate('/my-applications')}
+            onClick={() => navigate('/jobs/my-applications')}
             className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
           >
             Retour aux candidatures

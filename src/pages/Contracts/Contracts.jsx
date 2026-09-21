@@ -458,7 +458,6 @@ export default function Contracts() {
           icon={FileCheck}
           color="text-blue-300"
           bgColor="from-blue-600 to-blue-700"
-          trend={12}
           onClick={() => setFilters({ ...filters, status: "all" })}
         />
         <StatCard
@@ -467,7 +466,6 @@ export default function Contracts() {
           icon={CheckCircle}
           color="text-blue-300"
           bgColor="from-blue-600 to-blue-700"
-          trend={8}
           onClick={() => setFilters({ ...filters, status: "accepted" })}
         />
         <StatCard
@@ -476,7 +474,6 @@ export default function Contracts() {
           icon={Clock}
           color="text-blue-300"
           bgColor="from-blue-500 to-blue-600"
-          trend={-3}
           onClick={() => setFilters({ ...filters, status: "pending" })}
         />
         <StatCard
@@ -485,7 +482,6 @@ export default function Contracts() {
           icon={XCircle}
           color="text-gray-300"
           bgColor="from-gray-600 to-gray-700"
-          trend={2}
           onClick={() => setFilters({ ...filters, status: "rejected" })}
         />
       </div>

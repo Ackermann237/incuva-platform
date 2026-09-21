@@ -70,15 +70,6 @@ export default function StatsCard({ planning = [], employees = [] }) {
               <div className={`w-10 h-10 bg-gradient-to-br ${stat.color} rounded-lg flex items-center justify-center text-white shadow-md`}>
                 <Icon className="w-5 h-5" />
               </div>
-              <div className={`text-xs font-bold px-2 py-1 rounded-full ${
-                index === 0 ? 'bg-blue-100 text-blue-800' :
-                index === 1 ? 'bg-green-100 text-green-800' :
-                index === 2 ? 'bg-purple-100 text-purple-800' :
-                index === 3 ? 'bg-orange-100 text-orange-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                +12%
-              </div>
             </div>
             <h3 className="text-gray-600 text-sm font-medium mb-1">{stat.title}</h3>
             <p className="text-2xl font-bold text-gray-900">{stat.value}</p>

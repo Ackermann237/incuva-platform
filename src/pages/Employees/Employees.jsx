@@ -1,5 +1,6 @@
 // src/pages/Employees/Employees.jsx
 import React, { useState, useEffect } from 'react';
+import LottieLoader from '../../components/lottie/LottieLoader';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Search, Filter, Download, UserPlus, MoreVertical,
@@ -7,7 +8,7 @@ import {
   Building, MapPin, Phone, Mail, Calendar, Briefcase,
   BarChart3, ChevronRight, Loader2, AlertCircle
 } from 'lucide-react';
-import { getEmployees, getEmployeeStats, searchEmployees, exportEmployeesToCSV } from '../../services/employees';
+import { getEmployees, getEmployeeStats, searchEmployees, exportEmployeesToCSV, updateEmployee } from '../../services/employees';
 
 export default function Employees() {
   const navigate = useNavigate();
@@ -30,6 +31,59 @@ export default function Employees() {
   // États pour le détail
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // Modification d'un employé depuis la fiche détaillée
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
+    setIsEditing(false);
+    setSaveError('');
+  };
+
+  const startEditing = () => {
+    setEditForm({
+      position: selectedEmployee.position || '',
+      salary: selectedEmployee.salary ?? '',
+      contract_type: selectedEmployee.contract_type || 'CDI',
+      status: selectedEmployee.status || 'active'
+    });
+    setSaveError('');
+    setIsEditing(true);
+  };
+
+  const saveEditing = async () => {
+    if (!editForm.position.trim()) {
+      setSaveError('Le poste est obligatoire.');
+      return;
+    }
+    if (editForm.salary === '' || Number(editForm.salary) < 0) {
+      setSaveError('Le salaire doit être un nombre positif.');
+      return;
+    }
+
+    setSaving(true);
+    setSaveError('');
+    const updates = {
+      position: editForm.position.trim(),
+      salary: Number(editForm.salary),
+      contract_type: editForm.contract_type,
+      status: editForm.status
+    };
+    const res = await updateEmployee(selectedEmployee.id, updates);
+    setSaving(false);
+
+    if (res.success) {
+      setSelectedEmployee(prev => ({ ...prev, ...updates }));
+      setIsEditing(false);
+      fetchEmployees();
+    } else {
+      setSaveError(res.error || 'Erreur lors de la mise à jour');
+    }
+  };
 
   // Charger les données initiales
   useEffect(() => {
@@ -156,12 +210,15 @@ export default function Employees() {
       case 'active': return 'Actif';
       case 'inactive': return 'Inactif';
       case 'on_leave': return 'En congé';
+      case 'terminated': return 'Contrat terminé';
       default: return 'Inconnu';
     }
   };
 
   const openEmployeeDetail = (employee) => {
     setSelectedEmployee(employee);
+    setIsEditing(false);
+    setSaveError('');
     setShowDetailModal(true);
   };
 
@@ -178,10 +235,7 @@ export default function Employees() {
   if (loading && !employees.length) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement des employés...</p>
-        </div>
+        <LottieLoader label="Chargement des employés..." />
       </div>
     );
   }
@@ -526,7 +580,7 @@ export default function Employees() {
                 </div>
               </div>
               <button
-                onClick={() => setShowDetailModal(false)}
+                onClick={closeDetailModal}
                 className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 ✕
@@ -583,32 +637,81 @@ export default function Employees() {
                   </h4>
 
                   <div className="space-y-3">
+                    {saveError && (
+                      <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                        {saveError}
+                      </div>
+                    )}
+
                     <div>
                       <p className="text-sm text-gray-600">Poste</p>
-                      <p className="font-medium">{selectedEmployee.position}</p>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editForm.position}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, position: e.target.value }))}
+                          className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        />
+                      ) : (
+                        <p className="font-medium">{selectedEmployee.position}</p>
+                      )}
                     </div>
 
                     <div>
                       <p className="text-sm text-gray-600">Salaire annuel brut</p>
-                      <p className="font-medium text-lg text-green-600">
-                        {selectedEmployee.salary
-                          ? `${Number(selectedEmployee.salary).toLocaleString()} €`
-                          : 'Non spécifié'
-                        }
-                      </p>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          min="0"
+                          value={editForm.salary}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, salary: e.target.value }))}
+                          className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        />
+                      ) : (
+                        <p className="font-medium text-lg text-green-600">
+                          {selectedEmployee.salary
+                            ? `${Number(selectedEmployee.salary).toLocaleString()} €`
+                            : 'Non spécifié'
+                          }
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <p className="text-sm text-gray-600">Type de contrat</p>
-                      <p className="font-medium">{selectedEmployee.contract_type}</p>
+                      {isEditing ? (
+                        <select
+                          value={editForm.contract_type}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, contract_type: e.target.value }))}
+                          className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        >
+                          {['CDI', 'CDD', 'Freelance', 'Stage', 'Alternance'].map(type => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="font-medium">{selectedEmployee.contract_type}</p>
+                      )}
                     </div>
 
                     <div>
                       <p className="text-sm text-gray-600">Statut</p>
-                      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(selectedEmployee.status)}`}>
-                        {getStatusIcon(selectedEmployee.status)}
-                        {getStatusLabel(selectedEmployee.status)}
-                      </div>
+                      {isEditing ? (
+                        <select
+                          value={editForm.status}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, status: e.target.value }))}
+                          className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        >
+                          {['active', 'inactive', 'on_leave', 'terminated'].map(status => (
+                            <option key={status} value={status}>{getStatusLabel(status)}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(selectedEmployee.status)}`}>
+                          {getStatusIcon(selectedEmployee.status)}
+                          {getStatusLabel(selectedEmployee.status)}
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -658,21 +761,39 @@ export default function Employees() {
 
             {/* Footer */}
             <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
-              <button
-                onClick={() => setShowDetailModal(false)}
-                className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
-              >
-                Fermer
-              </button>
-              <button
-                onClick={() => {
-                  // Action de modification
-                  console.log('Modifier employé', selectedEmployee.id);
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-              >
-                Modifier
-              </button>
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={() => { setIsEditing(false); setSaveError(''); }}
+                    disabled={saving}
+                    className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={saveEditing}
+                    disabled={saving}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
+                  >
+                    {saving ? 'Enregistrement...' : 'Enregistrer'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={closeDetailModal}
+                    className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+                  >
+                    Fermer
+                  </button>
+                  <button
+                    onClick={startEditing}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  >
+                    Modifier
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

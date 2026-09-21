@@ -1,5 +1,6 @@
 // src/pages/HR/DataAnalysis.jsx
 import React, { useState, useEffect } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import AIPromptModal from "../../components/AIPromptModal";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie,
@@ -49,14 +50,8 @@ export default function DataAnalysis({ data, loading, timeRange }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex flex-col items-center justify-center py-20">
-        <div className="relative">
-          <div className="w-20 h-20 border-4 border-blue-200 rounded-full"></div>
-          <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin absolute top-0"></div>
-        </div>
-        <div className="mt-6 space-y-2 text-center">
-          <p className="text-lg font-semibold text-gray-700">Chargement des analyses</p>
-          <p className="text-sm text-gray-500">Préparation des visualisations...</p>
-        </div>
+        <LottieLoader label="Chargement des analyses" size={120} className="py-0" />
+        <p className="text-sm text-gray-500">Préparation des visualisations...</p>
       </div>
     );
   }
@@ -179,8 +174,6 @@ export default function DataAnalysis({ data, loading, timeRange }) {
             label: "Candidatures",
             value: animatedValues.applications,
             icon: <Briefcase className="w-6 h-6" />,
-            change: "+12%",
-            trend: "up",
             color: "from-blue-500 to-blue-600",
             bgColor: "bg-gradient-to-br from-blue-50 to-blue-100"
           },
@@ -188,8 +181,6 @@ export default function DataAnalysis({ data, loading, timeRange }) {
             label: "Entretiens",
             value: animatedValues.interviews,
             icon: <Users className="w-6 h-6" />,
-            change: "+8%",
-            trend: "up",
             color: "from-blue-600 to-blue-700",
             bgColor: "bg-gradient-to-br from-blue-50 to-blue-100"
           },
@@ -197,8 +188,6 @@ export default function DataAnalysis({ data, loading, timeRange }) {
             label: "Contrats signés",
             value: animatedValues.contracts,
             icon: <CheckCircle className="w-6 h-6" />,
-            change: "+15%",
-            trend: "up",
             color: "from-cyan-500 to-blue-500",
             bgColor: "bg-gradient-to-br from-blue-50 to-cyan-50"
           },
@@ -206,8 +195,6 @@ export default function DataAnalysis({ data, loading, timeRange }) {
             label: "Taux de conversion",
             value: `${animatedValues.conversionRate}%`,
             icon: <TrendingUp className="w-6 h-6" />,
-            change: "+3.2%",
-            trend: "up",
             color: "from-indigo-500 to-blue-500",
             bgColor: "bg-gradient-to-br from-indigo-50 to-blue-50"
           },
@@ -220,10 +207,12 @@ export default function DataAnalysis({ data, loading, timeRange }) {
               <div className={`p-3 rounded-xl bg-gradient-to-br ${kpi.color} shadow-md`}>
                 {React.cloneElement(kpi.icon, { className: "w-6 h-6 text-white" })}
               </div>
-              <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${kpi.trend === 'up' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {kpi.trend === 'up' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                <span className="text-sm font-bold">{kpi.change}</span>
-              </div>
+              {kpi.change && (
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${kpi.trend === 'up' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {kpi.trend === 'up' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                  <span className="text-sm font-bold">{kpi.change}</span>
+                </div>
+              )}
             </div>
             <p className="text-3xl font-bold text-gray-900 mb-1">{kpi.value}</p>
             <p className="text-sm text-gray-600 font-medium">{kpi.label}</p>

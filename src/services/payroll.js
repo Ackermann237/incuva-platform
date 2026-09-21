@@ -35,8 +35,11 @@ export async function getEmployeesForPayroll() {
  */
 export async function getPayslips(params = {}) {
   try {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE_URL}/payslips?${queryString}`, {
+    // Les paramètres vides provoquent une redirection qui fait perdre la session : on les retire
+    const queryString = new URLSearchParams(
+      Object.entries(params).filter(([, value]) => value !== '' && value != null)
+    ).toString();
+    const response = await fetch(queryString ? `${API_BASE_URL}/payslips?${queryString}` : `${API_BASE_URL}/payslips`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'
@@ -154,6 +157,24 @@ export async function updatePayslip(payslipId, updateData) {
 /**
  * Approuver un bulletin de paie
  */
+export async function deletePayslip(payslipId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/payslip/${payslipId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Erreur lors de la suppression du bulletin' };
+    }
+    return { success: true, message: data.message };
+  } catch (error) {
+    console.error('Erreur deletePayslip:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function approvePayslip(payslipId) {
   try {
     const response = await fetch(`${API_BASE_URL}/payslip/${payslipId}/approve`, {
@@ -383,25 +404,14 @@ export async function getAllPayslipsForAI() {
 }
 
 // Mettez à jour la fonction analyzePayrollWithAI :
-export async function analyzePayrollWithAI(payrollData) {
+export async function analyzePayrollWithAI() {
   try {
-    // Récupérer tous les bulletins pour l'analyse IA
-    const allPayslipsRes = await getAllPayslipsForAI();
-
-    if (!allPayslipsRes.success) {
-      return { success: false, error: 'Impossible de récupérer les bulletins pour analyse' };
-    }
-
+    // Le serveur relit lui-même tous les bulletins : indicateurs, anomalies, projection et commentaire de l'IA
     const response = await fetch('/api/payroll/ai/analyze_payroll', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({
-        payroll_data: {
-          ...payrollData,
-          all_payslips: allPayslipsRes.payslips // Ajouter tous les bulletins
-        }
-      })
+      body: JSON.stringify({})
     });
 
     const data = await response.json();

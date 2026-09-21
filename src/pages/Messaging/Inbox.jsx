@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { useNavigate } from "react-router-dom";
 import {
   MessageCircle,
@@ -458,7 +459,10 @@ export default function Inbox() {
             <CheckCheck className="w-4 h-4" />
             <span>Tout marquer lu</span>
           </button>
-          <button className="w-full flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-purple-50 rounded-lg transition-all text-sm">
+          <button
+            onClick={() => navigate("/settings")}
+            className="w-full flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-purple-50 rounded-lg transition-all text-sm"
+          >
             <Settings className="w-4 h-4" />
             <span>Paramètres</span>
           </button>
@@ -562,13 +566,7 @@ export default function Inbox() {
 
         <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-4 lg:py-6">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="relative w-16 h-16">
-                <div className="absolute inset-0 border-4 border-purple-200 rounded-full" />
-                <div className="absolute inset-0 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
-              </div>
-              <p className="mt-6 text-gray-600 font-semibold">Chargement...</p>
-            </div>
+            <LottieLoader label="Chargement des conversations..." />
           ) : filteredChats.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20">
               <div className="w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mb-6">
@@ -600,7 +598,7 @@ export default function Inbox() {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @media (max-width: 1024px) {
           .ml-12 { margin-left: 3rem; }
         }

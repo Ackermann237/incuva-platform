@@ -1,6 +1,8 @@
 // src/pages/Contracts/ViewContract.jsx
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import LottieLoader from "../../components/lottie/LottieLoader";
+import { escapeHtml, sanitizeHtml } from "../../utils/safeHtml";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   FileText,
   Download,
@@ -21,8 +23,12 @@ import contractsService from "../../services/contracts";
 import { fr } from "date-fns/locale";
 import { format } from "date-fns";
 
-export default function ViewContract({ contractId, onSign, onReject, onClose }) {
+export default function ViewContract({ contractId: contractIdProp, onSign, onReject, onClose: onCloseProp }) {
   const navigate = useNavigate();
+  // Utilisé en fenêtre (l'ID arrive en prop) ou comme page /contracts/view/:contractId (l'ID vient de l'URL)
+  const { contractId: contractIdFromUrl } = useParams();
+  const contractId = contractIdProp || contractIdFromUrl;
+  const onClose = onCloseProp || (() => navigate(-1));
 
   const [contract, setContract] = useState(null);
   const [companyName, setCompanyName] = useState("");
@@ -87,7 +93,7 @@ export default function ViewContract({ contractId, onSign, onReject, onClose }) 
     printWindow.document.write(`
       <html>
         <head>
-          <title>Contrat - ${contract.position}</title>
+          <title>Contrat - ${escapeHtml(contract.position)}</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 40px; line-height: 1.6; }
             h1 { color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; }
@@ -102,18 +108,18 @@ export default function ViewContract({ contractId, onSign, onReject, onClose }) 
         </head>
         <body>
           <h1>Contrat de travail</h1>
-          <div class="info"><strong>Poste :</strong> ${contract.position}</div>
-          <div class="info"><strong>Candidat :</strong> ${contract.candidate_name}</div>
-          <div class="info"><strong>Entreprise :</strong> ${companyName}</div>
+          <div class="info"><strong>Poste :</strong> ${escapeHtml(contract.position)}</div>
+          <div class="info"><strong>Candidat :</strong> ${escapeHtml(contract.candidate_name)}</div>
+          <div class="info"><strong>Entreprise :</strong> ${escapeHtml(companyName)}</div>
           <div class="info"><strong>Salaire :</strong> ${Number(contract.salary).toLocaleString()} € brut/an</div>
-          <div class="info"><strong>Type :</strong> ${contract.contract_type}</div>
+          <div class="info"><strong>Type :</strong> ${escapeHtml(contract.contract_type)}</div>
           <div class="info"><strong>Date :</strong> ${format(new Date(contract.created_at), "dd MMMM yyyy", { locale: fr })}</div>
           <div class="info"><strong>Statut :</strong> 
             <span class="status ${contract.status}">
               ${contract.status === "accepted" ? "Accepté" : contract.status === "pending" ? "En attente" : "Refusé"}
             </span>
           </div>
-          ${contract.description ? `<div class="info"><strong>Description :</strong><p>${contract.description.replace(/\n/g, "<br>")}</p></div>` : ""}
+          ${contract.description ? `<div class="info"><strong>Description :</strong><p>${sanitizeHtml(contract.description).replace(/\n/g, "<br>")}</p></div>` : ""}
           ${contract.status === "accepted" ? `<div class="signature"><strong>Signé électroniquement le</strong> ${format(new Date(contract.updated_at), "dd MMMM yyyy à HH:mm", { locale: fr })}</div>` : ""}
         </body>
       </html>
@@ -138,12 +144,7 @@ export default function ViewContract({ contractId, onSign, onReject, onClose }) 
   // === ÉCRAN DE CHARGEMENT ===
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement du contrat...</p>
-        </div>
-      </div>
+      <LottieLoader label="Chargement du contrat..." />
     );
   }
 
@@ -232,7 +233,7 @@ export default function ViewContract({ contractId, onSign, onReject, onClose }) 
                 <p className="text-sm font-semibold text-blue-900 mb-4">Description / Avantages</p>
                 <div
                   className="prose prose-blue max-w-none text-gray-800"
-                  dangerouslySetInnerHTML={{ __html: contract.description }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(contract.description) }}
                 />
               </div>
             )}

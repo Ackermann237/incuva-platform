@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { Calendar, Video, Phone, MapPin, FileText, Upload, Plus, Clock, User } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { sendMessage, scheduleInterview } from "../../services/messaging";
@@ -95,10 +96,7 @@ export default function ScheduleInterview() {
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-            <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-            <p className="mt-4 text-gray-600 font-medium">Chargement...</p>       .
-            </div>
+            <LottieLoader label="Chargement..." />
             </div>
         );
     }

@@ -1,5 +1,7 @@
 // src/pages/Contracts/SignContract.jsx
 import React, { useEffect, useState, useRef } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
+import { sanitizeHtml } from "../../utils/safeHtml";
 import {
   CheckCircle,
   XCircle,
@@ -445,12 +447,7 @@ export default function SignContract({ contractId, onSuccess, onClose }) {
   // Affichage du chargement
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-16">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Chargement du contrat...</p>
-        </div>
-      </div>
+      <LottieLoader label="Chargement du contrat..." />
     );
   }
 
@@ -540,7 +537,7 @@ export default function SignContract({ contractId, onSuccess, onClose }) {
               <div className="prose prose-sm md:prose-base max-w-none text-gray-800">
                 <div
                   dangerouslySetInnerHTML={{
-                    __html: cleanAndFormatContent(contract.contract?.contract_content)
+                    __html: sanitizeHtml(cleanAndFormatContent(contract.contract?.contract_content))
                   }}
                 />
               </div>
@@ -747,7 +744,7 @@ export default function SignContract({ contractId, onSuccess, onClose }) {
       </div>
 
       {/* Styles supplémentaires */}
-      <style jsx global>{`
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
         }

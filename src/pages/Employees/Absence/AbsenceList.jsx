@@ -220,21 +220,7 @@ const AbsenceList = ({
       <div className="px-6 py-4 border-t border-gray-200">
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-700">
-            Affichage de <span className="font-medium">1</span> à <span className="font-medium">{Math.min(absences.length, 10)}</span> sur <span className="font-medium">{absences.length}</span> résultats
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
-              Précédent
-            </button>
-            <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-              1
-            </button>
-            <button className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
-              2
-            </button>
-            <button className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
-              Suivant
-            </button>
+            <span className="font-medium">{absences.length}</span> résultat{absences.length > 1 ? 's' : ''}
           </div>
         </div>
       </div>

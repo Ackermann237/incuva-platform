@@ -1,5 +1,6 @@
 // src/pages/Jobs/Entreprises/JobsListModal.jsx
 import React, { useState, useEffect } from 'react';
+import LottieLoader from '../../../components/lottie/LottieLoader';
 import { useNavigate } from 'react-router-dom';
 import {
   X,
@@ -226,10 +227,7 @@ export default function JobsListModal({ onClose, onSelectJob }) {
 
           {/* Contenu - Liste des jobs */}
           {loading ? (
-            <div className="text-center py-12">
-              <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Chargement de vos offres d'emploi...</p>
-            </div>
+            <LottieLoader label="Chargement de vos offres d'emploi..." className="py-12" />
           ) : filteredJobs.length === 0 ? (
             <div className="text-center py-12">
               <Briefcase className="w-20 h-20 text-gray-300 mx-auto mb-6" />

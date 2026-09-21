@@ -1,5 +1,6 @@
 // src/pages/Jobs/CandidateView.jsx
 import React, { useState, useEffect } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { useNavigate } from "react-router-dom";
 import { getJobList, getJobApplications } from "../../services/jobs";
 import { Briefcase, Users, X, MessageCircle, Clock, CheckCircle, XCircle } from "lucide-react";
@@ -96,10 +97,7 @@ export default function CandidateView() {
 
   if (loading) {
     return (
-      <div className="p-8 text-center">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-        <p className="mt-2 text-gray-600">Chargement des candidatures...</p>
-      </div>
+      <LottieLoader label="Chargement des candidatures..." />
     );
   }
 
@@ -128,7 +126,7 @@ export default function CandidateView() {
                     {apps.length}
                   </div>
                 </div>
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{job.description}</p>
+                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{(job.description || '').replace(/\*\*/g, '')}</p>
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <span>{job.location}</span>
                   <span>{format(toJSDate(job.submitted_at), "dd MMMM yyyy", { locale: fr })}</span>

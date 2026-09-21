@@ -1,5 +1,6 @@
 // src/pages/Employees/Payroll/Payroll.jsx
 import React, { useState, useEffect } from 'react';
+import LottieLoader from '../../../components/lottie/LottieLoader';
 import { useNavigate } from 'react-router-dom';
 import {
   DollarSign, Users, FileText, CheckCircle, Clock,
@@ -17,7 +18,8 @@ import {
   getPayslips,
   getPayrollStats,
   approvePayslip,
-  markPayslipAsPaid
+  markPayslipAsPaid,
+  deletePayslip
 } from '../../../services/payroll';
 
 export default function Payroll() {
@@ -90,6 +92,17 @@ export default function Payroll() {
     }
   };
 
+  const handleDeletePayslip = async (payslipId) => {
+    if (confirm('Supprimer ce bulletin en brouillon ? Cette action est définitive.')) {
+      const result = await deletePayslip(payslipId);
+      if (result.success) {
+        fetchData();
+      } else {
+        alert(result.error);
+      }
+    }
+  };
+
   const handleMarkAsPaid = async (payslipId) => {
     if (confirm('Marquer ce bulletin comme payé ?')) {
       const result = await markPayslipAsPaid(payslipId);
@@ -135,10 +148,7 @@ export default function Payroll() {
   if (loading && !payslips.length) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Chargement de la paie...</p>
-        </div>
+        <LottieLoader label="Chargement de la paie..." />
       </div>
     );
   }
@@ -352,14 +362,16 @@ export default function Payroll() {
                             </button>
                           )}
 
-                          {/* Bouton Supprimer (optionnel) */}
-                          <button
-                            onClick={() => {/* Navigation vers la suppression */}}
-                            className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {/* Suppression : uniquement pour un bulletin en brouillon */}
+                          {payslip.status === 'draft' && (
+                            <button
+                              onClick={() => handleDeletePayslip(payslip.id)}
+                              className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

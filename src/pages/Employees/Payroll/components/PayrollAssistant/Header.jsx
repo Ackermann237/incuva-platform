@@ -1,11 +1,11 @@
 // src/pages/Employees/Payroll/components/PayrollAssistant/Header.jsx
 import React from 'react';
-import { X, Sparkles, FileText } from 'lucide-react';
+import { X, Sparkles, FileBarChart, MessageSquare } from 'lucide-react';
 
-export default function Header({ analysis, allPayslips, onClose }) {
+export default function Header({ analysis, allPayslips, onClose, view, setView }) {
   return (
     <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
             <Sparkles className="w-6 h-6 text-white" />
@@ -19,12 +19,29 @@ export default function Header({ analysis, allPayslips, onClose }) {
             </p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-all hover:scale-105"
-        >
-          <X className="w-5 h-5" />
-        </button>
+
+        <div className="flex items-center gap-3">
+          {analysis && (
+            <div className="flex rounded-lg border border-gray-300 bg-white p-0.5 text-sm font-medium">
+              {[['report', 'Rapport', FileBarChart], ['chat', 'Discussion', MessageSquare]].map(([id, label, Icon]) => (
+                <button
+                  key={id}
+                  onClick={() => setView(id)}
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-all ${view === id ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <Icon className="h-4 w-4" /> {label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-all hover:scale-105"
+            aria-label="Fermer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 // src/pages/Jobs/users/TrainingInterview/components/JobDetailsModal.jsx
 import React from 'react';
+import { escapeHtml } from '../../../../../utils/safeHtml';
 import {
   X, Briefcase, MapPin, DollarSign, Calendar, FileText,
   CheckCircle, Users, Building, Globe, Award, Clock
@@ -17,8 +18,8 @@ export default function JobDetailsModal({ job, onClose }) {
   const formatDescription = (content) => {
     if (!content) return "";
 
-    // 1. Supprimer les **
-    let formatted = content.replace(/\*\*/g, '');
+    // 1. Échapper le HTML (contenu saisi par l'utilisateur), puis supprimer les **
+    let formatted = escapeHtml(content).replace(/\*\*/g, '');
 
     // 2. Remplacer les tirets par des listes stylisées si nécessaire (optionnel ici car on a extractSections)
     // 3. Gérer les retours à la ligne

@@ -1,5 +1,7 @@
 // src/pages/Jobs/JobList.jsx
 import React, { useEffect, useState } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
+import { escapeHtml } from "../../utils/safeHtml";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getJobList, getDashboardStats } from "../../services/jobs";
 import CandidateView from "./CandidateView";
@@ -59,8 +61,8 @@ export default function JobList() {
   // --- FONCTION DE FORMATAGE POUR LA CARTE ---
   const formatDescription = (content) => {
     if (!content) return "";
-    // 1. Convertir le Markdown Gras en HTML
-    let formatted = content.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>');
+    // 1. Échapper le HTML (contenu saisi par l'utilisateur), puis convertir le Markdown Gras en HTML
+    let formatted = escapeHtml(content).replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>');
     // 2. Supprimer les ** restants
     formatted = formatted.replace(/\*\*/g, '');
     return formatted;
@@ -74,10 +76,7 @@ export default function JobList() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-6">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Chargement du tableau de bord...</p>
-        </div>
+        <LottieLoader label="Chargement des offres..." />
       </div>
     );
   }
@@ -125,19 +124,6 @@ export default function JobList() {
             })}
           </nav>
 
-          <div className="p-6 border-t-2 border-blue-50">
-            <h3 className="text-sm font-bold text-gray-600 mb-4">Performance</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Taux de réponse</span>
-                <span className="font-bold text-green-600">68%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Temps moyen</span>
-                <span className="font-bold text-blue-600">4.2 jours</span>
-              </div>
-            </div>
-          </div>
         </aside>
 
         {/* MAIN CONTENT */}

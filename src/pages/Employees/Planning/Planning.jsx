@@ -1,5 +1,7 @@
 // src/pages/Employees/Planning/Planning.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import LottieLoader from '../../../components/lottie/LottieLoader';
+import OptimizerModal from './OptimizerModal';
 import Header from './Header';
 import Filters from './Filters';
 import CalendarView from './CalendarView';
@@ -12,6 +14,11 @@ export default function Planning() {
   const [planning, setPlanning] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [notice, setNotice] = useState('');
+  const [showOptimizer, setShowOptimizer] = useState(false);
+  const hasLoaded = useRef(false);
   const [error, setError] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
   // CHANGEMENT ICI : 'calendar' par défaut au lieu de 'week'
@@ -33,8 +40,11 @@ export default function Planning() {
     fetchData();
   }, [currentDate, viewMode, filters]);
 
-  const fetchData = async () => {
-      setLoading(true);
+  // `manual` : clic sur « Actualiser » (confirmation affichée à la fin)
+  const fetchData = async (manual = false) => {
+      // Le grand écran de chargement n'apparaît qu'à la première ouverture ; ensuite on garde la page affichée
+      if (hasLoaded.current) setRefreshing(true);
+      else setLoading(true);
       setError('');
 
       try {
@@ -61,12 +71,21 @@ export default function Planning() {
         } else {
           setError(planningRes.error || 'Erreur lors du chargement du planning');
         }
+        if (manual === true) showNotice('Planning actualisé.');
       } catch (err) {
         setError('Erreur réseau lors du chargement des données');
         console.error(err);
       } finally {
+        hasLoaded.current = true;
+        setLastUpdated(new Date());
         setLoading(false);
+        setRefreshing(false);
       }
+  };
+
+  const showNotice = (text) => {
+    setNotice(text);
+    setTimeout(() => setNotice(''), 3000);
   };
 
   const getStartDate = () => {
@@ -139,13 +158,10 @@ export default function Planning() {
     setSelectedEmployee(null);
   };
 
-  if (loading && !planning.length) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement du planning...</p>
-        </div>
+        <LottieLoader label="Chargement du planning..." />
       </div>
     );
   }
@@ -165,8 +181,17 @@ export default function Planning() {
             setEditingShift(null);
             setShowShiftModal(true);
           }}
-          onRefresh={fetchData}
+          onRefresh={() => fetchData(true)}
+          onOptimize={() => setShowOptimizer(true)}
+          refreshing={refreshing}
+          lastUpdated={lastUpdated}
         />
+
+        {notice && (
+          <div role="status" className="fixed bottom-6 right-6 z-[9998] rounded-xl bg-gray-900 px-4 py-3 text-sm font-medium text-white shadow-lg">
+            {notice}
+          </div>
+        )}
 
         {/* CHANGEMENT ICI : Espace ajouté entre les filtres et les statistiques */}
         <div className="space-y-6">
@@ -207,6 +232,16 @@ export default function Planning() {
             />
           )}
         </div>
+
+        {/* Optimiseur IA : après application, on affiche la semaine planifiée */}
+        <OptimizerModal
+          isOpen={showOptimizer}
+          onClose={() => setShowOptimizer(false)}
+          onApplied={(monday) => {
+            setCurrentDate(new Date(monday));
+            fetchData();
+          }}
+        />
 
         {/* Modal pour les shifts */}
         <ShiftModal

@@ -1,6 +1,6 @@
 // src/pages/Jobs/users/TrainingInterview/VisioTraining.jsx
 import React, {useState, useEffect, useRef, useCallback} from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Camera, Mic, MicOff, Video, VideoOff, Phone, MessageSquare, User, Sparkles, X, Settings, Headphones, Share2, Volume2, VolumeX, Download, Clock, AlertCircle, Send, Loader2, SkipForward, CheckCircle, Star, Zap, ZapOff, Pause, Play } from 'lucide-react';
 import { getInterviewQuestions } from '../../../../services/TrainingInterview';
 import { startVisioInterview, submitVisioAnswer, endVisioSession } from '../../../../services/VisioTraining';
@@ -10,6 +10,7 @@ import Webcam from 'react-webcam';
 
 export default function VisioTraining() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { applicationId } = useParams();
 
   // États principaux
@@ -206,22 +207,35 @@ export default function VisioTraining() {
       setLoading(true);
       isProcessingRef.current = false;
 
-      // Simuler des données de candidature
-      const mockApplication = {
-        job_id: 'job123',
-        job_title: 'Développeur Full Stack',
-        company_name: 'TechCorp',
-        description: 'Nous recherchons un développeur full stack expérimenté...'
-      };
+      // Candidature réelle : transmise par la navigation, sinon chargée depuis l'API
+      let application = location.state?.application;
+      if (!application && applicationId) {
+        const res = await fetch(`/api/jobs/api/application/${applicationId}`, { credentials: 'include' });
+        const data = await res.json();
+        if (!data.success) {
+          throw new Error(data.error || 'Impossible de charger les détails de la candidature');
+        }
+        application = data.application;
+      }
+
+      // Sans candidature (page ouverte sans identifiant) : entretien de démonstration
+      if (!application) {
+        application = {
+          job_id: 'demo',
+          job_title: 'Développeur Full Stack',
+          company_name: 'Entreprise de démonstration',
+          description: 'Nous recherchons un développeur full stack expérimenté...'
+        };
+      }
 
       setJobDetails({
-        title: mockApplication.job_title,
-        company: mockApplication.company_name,
-        description: mockApplication.description
+        title: application.job_title,
+        company: application.company_name,
+        description: application.description
       });
 
       // Démarrer la session visio
-      const visioRes = await startVisioInterview(applicationId || 'mock', mockApplication);
+      const visioRes = await startVisioInterview(applicationId || 'demo', application);
 
       if (visioRes.success) {
         setInterviewData(visioRes.data);
@@ -229,7 +243,7 @@ export default function VisioTraining() {
         setMaxAnswerTime(visioRes.data.questions[0]?.time_limit || 120);
 
         // Initialiser la conversation
-        const welcomeMessage = `Bonjour ! Je suis votre assistant d'entretien virtuel. Je vais vous poser ${visioRes.data.questions.length} questions pour le poste de ${mockApplication.job_title}. Préparez-vous !`;
+        const welcomeMessage = `Bonjour ! Je suis votre assistant d'entretien virtuel. Je vais vous poser ${visioRes.data.questions.length} questions pour le poste de ${application.job_title}. Préparez-vous !`;
 
         setConversation([
           {
@@ -807,7 +821,7 @@ export default function VisioTraining() {
             <h3 className="text-xl font-bold text-gray-900 mb-2">Erreur de connexion</h3>
             <p className="text-blue-700 mb-6">{error}</p>
             <button
-              onClick={() => navigate('/my-applications')}
+              onClick={() => navigate('/jobs/my-applications')}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Retour aux candidatures
@@ -826,7 +840,7 @@ export default function VisioTraining() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => navigate('/my-applications')}
+                onClick={() => navigate('/jobs/my-applications')}
                 className="p-2 hover:bg-blue-50 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-gray-700" />

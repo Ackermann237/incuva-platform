@@ -1,5 +1,6 @@
 // src/pages/Offers/MyApplications/MyApplications.jsx
 import React, { useState, useEffect } from 'react';
+import LottieLoader from '../../../components/lottie/LottieLoader';
 import { useNavigate } from 'react-router-dom';
 import { getMyApplications } from '../../../services/jobs';
 import Header from './components/Header';
@@ -110,10 +111,7 @@ export default function MyApplications() {
   if (loading && applications.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement de vos candidatures...</p>
-        </div>
+        <LottieLoader label="Chargement de vos candidatures..." />
       </div>
     );
   }

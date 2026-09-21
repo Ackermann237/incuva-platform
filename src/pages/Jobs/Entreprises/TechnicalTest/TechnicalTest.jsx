@@ -1,5 +1,6 @@
 // src/pages/Jobs/Entreprises/TechnicalTest/TechnicalTest.jsx
 import React, { useState, useEffect } from 'react';
+import LottieLoader from '../../../../components/lottie/LottieLoader';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   createTechnicalTest,
@@ -520,10 +521,7 @@ export default function TechnicalTest() {
   if (loading && !job) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4 border-4 border-blue-200 border-t-blue-600 rounded-full" />
-          <p className="text-gray-600">Chargement...</p>
-        </div>
+        <LottieLoader label="Chargement..." />
       </div>
     );
   }

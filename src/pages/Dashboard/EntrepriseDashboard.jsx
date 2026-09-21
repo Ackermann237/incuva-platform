@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserDashboard, getDataAnalysis } from "../../services/dashboard";
 import { getRecruitmentManagement } from "../../services/hr";
+import { logout } from "../../services/auth";
 import RecruitmentManagement from "../../pages/HR/RecruitmentManagement";
 import DataAnalysis from "../../pages/HR/DataAnalysis";
 import Contracts from "../../pages/Contracts/Contracts";
@@ -11,6 +12,8 @@ import Planning from "../Employees/Planning/Planning.jsx";
 import Absence from "../Employees/Absence/Absence.jsx";
 import Payroll from "../Employees/Payroll/Payroll.jsx"; // IMPORT AJOUTÉ
 import Conversational from "../conversationnal/Conversational";
+import NotificationsButton from "../../components/NotificationsButton";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import {
   Layers, BarChart2, Users, Briefcase, FileCheck, TrendingUp,
   Calendar, Award, Target, Building2, MapPin, DollarSign,
@@ -22,6 +25,17 @@ import {
 
 export default function EntrepriseDashboard() {
   const navigate = useNavigate();
+
+  // Déconnexion : on ferme la session côté serveur puis on revient à la page d'accueil
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.error("Erreur lors de la déconnexion:", err);
+    }
+    navigate("/", { replace: true });
+  };
+
   const [data, setData] = useState(null);
   const [recruitmentData, setRecruitmentData] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
@@ -130,13 +144,14 @@ export default function EntrepriseDashboard() {
 
     // Ajouter la dernière candidature
     if (applications && applications.length > 0) {
-      const latestApplication = applications.sort((a, b) => new Date(b.applied_at) - new Date(a.applied_at))[0];
+      const appDate = (app) => new Date(app.submitted_at || app.applied_at);
+      const latestApplication = [...applications].sort((a, b) => appDate(b) - appDate(a))[0];
       activity.push({
         id: latestApplication.application_id,
         type: "application",
         title: "Nouvelle candidature reçue",
         candidate: latestApplication.candidate_name,
-        time: formatTime(latestApplication.applied_at),
+        time: formatTime(latestApplication.submitted_at || latestApplication.applied_at),
         icon: <UserCheck className="w-5 h-5" />,
         color: "text-blue-600 bg-blue-50"
       });
@@ -177,15 +192,22 @@ export default function EntrepriseDashboard() {
   function formatTime(dateString) {
     if (!dateString) return "Il y a quelques instants";
     const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-    if (diffInHours < 24) {
-      return `Il y a ${diffInHours} ${diffInHours === 1 ? "heure" : "heures"}`;
-    } else if (diffInHours < 48) {
-      return "Hier";
-    } else {
-      return date.toLocaleDateString("fr-FR");
-    }
+    if (isNaN(date.getTime())) return "Date inconnue";
+
+    // Une date peut être dans le futur (entretien programmé) ou dans le passé
+    const diff = Date.now() - date.getTime();
+    const future = diff < 0;
+    const minutes = Math.floor(Math.abs(diff) / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
+
+    if (minutes < 1) return "À l'instant";
+    if (hours < 1) return future ? `Dans ${plural(minutes, "minute")}` : `Il y a ${plural(minutes, "minute")}`;
+    if (hours < 24) return future ? `Dans ${plural(hours, "heure")}` : `Il y a ${plural(hours, "heure")}`;
+    if (days === 1) return future ? "Demain" : "Hier";
+    if (days < 7) return future ? `Dans ${plural(days, "jour")}` : date.toLocaleDateString("fr-FR");
+    return date.toLocaleDateString("fr-FR");
   }
 
   if (error) {
@@ -205,17 +227,14 @@ export default function EntrepriseDashboard() {
   if (!data || loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full mx-auto animate-spin"></div>
-          <p className="text-gray-600 font-medium text-lg">Chargement de vos données...</p>
-        </div>
+        <LottieLoader label="Chargement de vos données..." size={140} />
       </div>
     );
   }
 
   const company = data.user;
   const stats = {
-    applications: data.metrics?.applications || 0,
+    applications: data.applications?.length || 0,
     favorites: data.favorite_count || 0,
     interviews: data.interviews?.length || 0,
     contracts: data.agreements?.length || 0
@@ -255,7 +274,7 @@ export default function EntrepriseDashboard() {
       path: null,
       badge: null
     },
-    { id: "messaging", label: "Messagerie", icon: MessageSquare, path: "/messaging/inbox", badge: 5 },
+    { id: "messaging", label: "Messagerie", icon: MessageSquare, path: "/messaging/inbox", badge: null },
     { id: "jobs", label: "Offres d'emploi", icon: Briefcase, path: "/jobs" },
     { id: "technical-tests", label: "Tests Techniques", icon: ClipboardCheck, path: "/technical-tests" },
     { id: "contracts", label: "Contrats", icon: FileCheck, path: null },
@@ -382,6 +401,7 @@ export default function EntrepriseDashboard() {
             {/* Secondary Actions */}
             <div className="space-y-2">
               <button
+                onClick={() => navigate("/settings")}
                 className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start px-3' : 'justify-center px-0'} py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all group relative overflow-hidden`}
                 title="Paramètres"
               >
@@ -395,26 +415,36 @@ export default function EntrepriseDashboard() {
                 )}
               </button>
 
-              <button
-                className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start px-3' : 'justify-center px-0'} py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all group relative overflow-hidden`}
-                title="Notifications"
-              >
-                <div className={`${isSidebarExpanded ? 'w-5 h-5' : 'w-6 h-6'} flex-shrink-0 flex items-center justify-center relative`}>
-                  <Bell className={`${isSidebarExpanded ? 'w-5 h-5' : 'w-6 h-6'} group-hover:scale-110 transition-transform`} />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                </div>
-                {isSidebarExpanded && (
-                  <span className="text-sm font-medium ml-3 whitespace-nowrap">
-                    Notifications
-                  </span>
+              <NotificationsButton
+                renderTrigger={({ onClick, unread }) => (
+                  <button
+                    onClick={onClick}
+                    className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start px-3' : 'justify-center px-0'} py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all group relative overflow-hidden`}
+                    title="Notifications"
+                  >
+                    <div className={`${isSidebarExpanded ? 'w-5 h-5' : 'w-6 h-6'} flex-shrink-0 flex items-center justify-center relative`}>
+                      <Bell className={`${isSidebarExpanded ? 'w-5 h-5' : 'w-6 h-6'} group-hover:scale-110 transition-transform`} />
+                      {unread > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 bg-red-500 text-white text-[10px] font-bold leading-4 text-center rounded-full">
+                          {unread > 9 ? "9+" : unread}
+                        </span>
+                      )}
+                    </div>
+                    {isSidebarExpanded && (
+                      <span className="text-sm font-medium ml-3 whitespace-nowrap">
+                        Notifications
+                      </span>
+                    )}
+                  </button>
                 )}
-              </button>
+              />
             </div>
           </nav>
 
           {/* User Profile & Logout */}
             <div className="p-4 border-t border-gray-100">
               <button
+                onClick={handleLogout}
                 className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start px-3' : 'justify-center px-0'} py-3 rounded-xl text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all group overflow-hidden`}
                 title="Déconnexion"
               >
@@ -532,7 +562,7 @@ function OverviewContent({ company, stats, recentActivity, data, navigate, setAc
           {[
             { icon: <Users className="w-8 h-8" />, label: "Taille entreprise", value: company.companySize },
             { icon: <Target className="w-8 h-8" />, label: "Secteur d'activité", value: company.industry },
-            { icon: <Award className="w-8 h-8" />, label: "Note entreprise", value: "4.8/5" }
+            { icon: <Award className="w-8 h-8" />, label: "Note entreprise", value: company.rating ? `${company.rating}/5` : "Pas encore notée" }
           ].map((item, idx) => (
             <div key={idx} className="flex items-center gap-4 hover:scale-102 transition-transform">
               <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105">
@@ -553,7 +583,6 @@ function OverviewContent({ company, stats, recentActivity, data, navigate, setAc
           {
             title: "Candidatures",
             value: stats.applications,
-            change: "+12%",
             icon: <BarChart2 className="w-6 h-6" />,
             gradient: "from-blue-500 to-blue-600",
             bgColor: "bg-blue-50"
@@ -561,7 +590,6 @@ function OverviewContent({ company, stats, recentActivity, data, navigate, setAc
           {
             title: "Talents favoris",
             value: stats.favorites,
-            change: "+8%",
             icon: <Users className="w-6 h-6" />,
             gradient: "from-blue-500 to-blue-600",
             bgColor: "bg-blue-50"
@@ -569,7 +597,6 @@ function OverviewContent({ company, stats, recentActivity, data, navigate, setAc
           {
             title: "Entretiens",
             value: stats.interviews,
-            change: "+15%",
             icon: <Calendar className="w-6 h-6" />,
             gradient: "from-blue-500 to-blue-600",
             bgColor: "bg-blue-50"
@@ -577,7 +604,6 @@ function OverviewContent({ company, stats, recentActivity, data, navigate, setAc
           {
             title: "Contrats signés",
             value: stats.contracts,
-            change: "+5%",
             icon: <FileCheck className="w-6 h-6" />,
             gradient: "from-blue-500 to-blue-600",
             bgColor: "bg-blue-50"
@@ -591,10 +617,12 @@ function OverviewContent({ company, stats, recentActivity, data, navigate, setAc
               <div className={`w-12 h-12 bg-gradient-to-br ${metric.gradient} rounded-xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
                 {metric.icon}
               </div>
-              <div className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-bold flex items-center gap-1">
-                <TrendingUp className="w-4 h-4" />
-                {metric.change}
-              </div>
+              {metric.change && (
+                <div className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-bold flex items-center gap-1">
+                  <TrendingUp className="w-4 h-4" />
+                  {metric.change}
+                </div>
+              )}
             </div>
             <h3 className="text-gray-600 text-sm font-medium mb-1">{metric.title}</h3>
             <p className="text-4xl font-bold text-gray-900 transition-all">{metric.value}</p>
@@ -619,6 +647,9 @@ function OverviewContent({ company, stats, recentActivity, data, navigate, setAc
               </button>
             </div>
             <div className="space-y-3">
+              {recentActivity.length === 0 && (
+                <p className="text-center text-gray-500 py-8">Aucune activité récente pour le moment.</p>
+              )}
               {recentActivity.map(activity => (
                 <div key={activity.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all cursor-pointer group">
                   <div className={`w-12 h-12 ${activity.color} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
@@ -682,21 +713,6 @@ function OverviewContent({ company, stats, recentActivity, data, navigate, setAc
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Performance Score */}
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-xl transition-all hover:shadow-2xl">
-            <h3 className="text-lg font-bold mb-2">Score Performance RH</h3>
-            <div className="flex items-end gap-2 mb-4">
-              <span className="text-5xl font-bold">87</span>
-              <span className="text-2xl mb-2">/100</span>
-            </div>
-            <div className="w-full bg-white/20 rounded-full h-3 mb-4 overflow-hidden">
-              <div className="bg-white rounded-full h-3 w-[87%] transition-all duration-1000"></div>
-            </div>
-            <p className="text-white/80 text-sm">
-              Excellent ! Vous êtes dans le top 15% des entreprises
-            </p>
           </div>
 
           {/* Tips Card */}

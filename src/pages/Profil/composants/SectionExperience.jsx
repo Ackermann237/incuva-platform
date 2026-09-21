@@ -2,7 +2,7 @@
 import React from 'react';
 import { Briefcase, Plus, Trash2 } from 'lucide-react';
 
-const SectionExperience = ({ profile, formData, isEditing, handleArrayChange, addItem, removeItem }) => {
+const SectionExperience = ({ profile, formData, isEditing, handleArrayChange, addItem, removeItem, onStartEdit }) => {
   return (
     <div className="bg-white rounded-3xl shadow-xl p-8">
       <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
@@ -38,7 +38,11 @@ const SectionExperience = ({ profile, formData, isEditing, handleArrayChange, ad
               <p className="text-gray-600">{exp.company} • {exp.start} – {exp.end || 'Aujourd\'hui'}</p>
               <p className="text-gray-700 mt-2">{exp.description}</p>
             </div>
-          )) : <p className="text-gray-500">Aucune expérience ajoutée</p>}
+          )) : (
+            <button type="button" onClick={onStartEdit} className="flex items-center gap-2 rounded-xl border border-dashed border-purple-300 px-5 py-3 text-purple-600 hover:bg-purple-50">
+              <Plus className="w-5 h-5" /> Ajouter une expérience
+            </button>
+          )}
         </div>
       )}
     </div>

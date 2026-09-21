@@ -7,8 +7,9 @@ import SelectAccountType from './pages/Auth/SelectAccountType';
 import RegisterIndividual from './pages/Auth/RegisterIndividual';
 import RegisterCompany from './pages/Auth/RegisterCompany';
 import VerifyEmail from "./pages/Auth/VerifyEmail";
-import UserDashboard from './pages/dashboard/UserDashboard';
-import EntrepriseDashboard from './pages/dashboard/EntrepriseDashboard';
+import ResetPassword from "./pages/Auth/ResetPassword";
+import UserDashboard from './pages/Dashboard/UserDashboard';
+import EntrepriseDashboard from './pages/Dashboard/EntrepriseDashboard';
 import TalentMarket from "./pages/HR/TalentMarket";
 import Messaging from "./pages/Messaging/Messaging";
 import Inbox from "./pages/Messaging/Inbox";
@@ -16,8 +17,10 @@ import ScheduleInterview from "./pages/Messaging/ScheduleInterview";
 import VideoRoom from "./pages/Messaging/VideoRoom";
 import CreateContract from "./pages/Contracts/CreateContract";
 import Contracts from "./pages/Contracts/Contracts";
+import AllContracts from "./pages/Contracts/allContracts";
 import ViewContract from "./pages/Contracts/ViewContract";
 import JobList from "./pages/Jobs/JobList";
+import CandidateView from "./pages/Jobs/CandidateView";
 import CreateOffers from "./pages/Jobs/CreateOffer";
 import EditJobs from "./pages/Jobs/EditJobs";
 import JobsDetails from "./pages/Jobs/JobsDetails";
@@ -25,8 +28,7 @@ import OffersAvailable from "./pages/Offers/OffersAvailable";
 import MyApplications from "./pages/Offers/MyApplications/MyApplications"
 import UserLayout from "./layouts/UserLayout";
 import ApplyJob from "./pages/Offers/ApplyJobs";
-import NewService from "./pages/Jobs/users/NewService";
-import UserProfil from './pages/profil/UserProfil';
+import UserProfil from './pages/Profil/UserProfil';
 import AITalentRecommendation from "./pages/HR/AITalentRecommendation";
 import Favorites from "./pages/HR/Favorites";
 import ProfilDetail from "./pages/HR/ProfilDetail";
@@ -41,11 +43,14 @@ import TestSelectionPage from "./pages/Jobs/Entreprises/TechnicalTest/Candidate/
 import Planning from './pages/Employees/Planning/Planning';
 import Absence from './pages/Employees/Absence/Absence';
 import Payroll from './pages/Employees/Payroll/Payroll';
+import BackToDashboard from './components/BackToDashboard';
+import Settings from './pages/Settings/Settings';
 
 
 function App() {
   return (
     <Router>
+      <BackToDashboard />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
@@ -54,6 +59,7 @@ function App() {
         <Route path="/register_individual" element={<RegisterIndividual />} />
         <Route path="/register_company" element={<RegisterCompany />} />
         <Route path="/verify_email" element={<VerifyEmail />} />
+        <Route path="/reset_password" element={<ResetPassword />} />
         <Route path="/content_user_dashboard" element={<UserDashboard />} />
         <Route path="/user_dashboard" element={<UserLayout />} />
         <Route path="/company_dashboard" element={<EntrepriseDashboard />} />
@@ -64,19 +70,18 @@ function App() {
         <Route path="/messaging/schedule/:chatId" element={<ScheduleInterview />} />
         <Route path="/messaging/video_room/:interviewId" element={<VideoRoom />} />
         <Route path="/contracts" element={<Contracts />} />
+        <Route path="/contracts/all" element={<AllContracts />} />
         <Route path="/contracts/create/:chatId/:candidateId" element={<CreateContract />} />
         <Route path="/contracts/view/:contractId" element={<ViewContract />} />
         <Route path="/jobs" element={<JobList />} />
         <Route path="/jobs/create" element={<CreateOffers />} />
-        <Route path="/jobs/edit/:jobId" element={<CreateOffers />} />
         <Route path="/jobs/edit/:jobId" element={<EditJobs />} />
-        <Route path="/jobs/candidates" element={<JobList />} />
+        <Route path="/jobs/candidates" element={<CandidateView />} />
         <Route path="/jobs/details/:jobId" element={<JobsDetails />} />
         <Route path="/jobs/offers" element={<OffersAvailable />} />
         <Route path="/jobs/apply/:jobId" element={<ApplyJob />} />
         <Route path="/jobs/my-applications" element={<MyApplications />} />
         <Route path="/profil" element={<UserProfil />} />
-        <Route path="/new-service" element={<NewService />} />
         <Route path="/ai-talent-recommendation" element={<AITalentRecommendation />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/hr/talent/:talentId" element={<ProfilDetail />} />
@@ -85,6 +90,7 @@ function App() {
         <Route path="/technical-tests" element={<TechnicalTestsDashboard />} />
         <Route path="/jobs/:jobId/technical-test" element={<TechnicalTest />} />
         <Route path="/jobs/:jobId/technical-test/:testId?" element={<TechnicalTest />} />
+        <Route path="/technical-test/:testId" element={<TechnicalTestPage />} />
         <Route path="/api/technical-test/:testId" element={<TechnicalTestPage />} />
         <Route path="/company/test-results" element={<TestResultsDashboard />} />
         <Route path="/test-results/:testId" element={<TestResultsDashboard />} />
@@ -93,6 +99,7 @@ function App() {
         <Route path="/absences" element={<Absence />} />
         <Route path="/payroll" element={<Payroll />} />
         <Route path="/visio-training/:applicationId?" element={<VisioTraining />} />
+        <Route path="/settings" element={<Settings />} />
 
         {/* Ajoute d'autres routes au besoin */}
       </Routes>
