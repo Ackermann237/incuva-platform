@@ -1,13 +1,16 @@
 # backend/app/routes/TechnicalTest.py
 from flask import Blueprint, request, jsonify, session, g
 from flask_cors import cross_origin
+import copy
 import logging
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..ai.TestAI import generate_technical_test
 from ..ai.copilote import call_ia
 from ..firebase.init_firebase import db
+from ..query_utils import sort_docs_desc
+from ..user_utils import display_name
 
 logger = logging.getLogger(__name__)
 
@@ -679,11 +682,10 @@ def get_job_technical_tests(job_id):
         # Récupérer les tests
         tests_query = db.collection('technical_tests') \
             .where('job_id', '==', job_id) \
-            .order_by('created_at', direction='DESCENDING') \
             .stream()
 
         tests = []
-        for doc in tests_query:
+        for doc in sort_docs_desc(tests_query, 'created_at'):
             test_data = doc.to_dict()
             test_data['id'] = doc.id
             tests.append(test_data)
@@ -696,6 +698,44 @@ def get_job_technical_tests(job_id):
     except Exception as e:
         logger.error(f"Erreur récupération tests: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+ANSWER_FIELDS = (
+    'correct_answer', 'correct_answers', 'expected_keywords', 'expected_output', 'explanation',
+    'solution', 'sample_solution', 'model_answer',
+)
+
+
+def is_test_manager(test_data):
+    """L'entreprise propriétaire du test, ou un administrateur."""
+    return 'uid' in session and (
+        session['uid'] == test_data.get('company_id') or session.get('account_type') == 'admin'
+    )
+
+
+def can_access_test(test_data):
+    """Propriétaire, admin, test public, ou candidat ayant postulé à l'offre à laquelle le test est rattaché."""
+    if test_data.get('is_public', False) or is_test_manager(test_data):
+        return True
+    if 'uid' not in session or not test_data.get('job_id'):
+        return False
+    application = db.collection('applications') \
+        .where('candidate_id', '==', session['uid']) \
+        .where('job_id', '==', test_data['job_id']).limit(1).get()
+    return len(application) > 0
+
+
+def strip_test_answers(test_data):
+    """Copie du test sans les réponses attendues (à montrer à un candidat)."""
+    data = copy.deepcopy(test_data)
+    for question in data.get('questions', []):
+        for field in ANSWER_FIELDS:
+            question.pop(field, None)
+        for option in question.get('options') or []:
+            if isinstance(option, dict):
+                option.pop('is_correct', None)
+                option.pop('explanation', None)
+    return data
+
 
 @technical_test_bp.route('/api/technical-tests/<test_id>', methods=['GET'])
 @cross_origin(supports_credentials=True)
@@ -711,19 +751,13 @@ def get_technical_test(test_id):
         test_data = test_doc.to_dict()
         test_data['id'] = test_id
 
-        # Vérifier l'accès
-        if test_data.get('is_public', False):
-            # Test public - accessible à tous
-            pass
-        elif 'uid' not in session:
+        # Vérifier l'accès : propriétaire, admin, test public, ou candidat ayant postulé à l'offre du test
+        if not can_access_test(test_data):
             return jsonify({'success': False, 'error': 'Accès non autorisé'}), 403
-        else:
-            # Vérifier si l'utilisateur est le propriétaire ou un admin
-            is_owner = session['uid'] == test_data.get('company_id')
-            is_admin = session.get('account_type') == 'admin'
 
-            if not (is_owner or is_admin):
-                return jsonify({'success': False, 'error': 'Accès non autorisé'}), 403
+        # Les bonnes réponses ne sont montrées qu'à l'entreprise propriétaire (ou à un admin), jamais aux candidats
+        if not is_test_manager(test_data):
+            test_data = strip_test_answers(test_data)
 
         return jsonify({
             'success': True,
@@ -876,6 +910,10 @@ def submit_technical_test(test_id):
         if test_data.get('status') != 'active':
             return jsonify({'success': False, 'error': 'Ce test n\'est plus actif'}), 400
 
+        # Seul un candidat ayant postulé à l'offre (ou un test public) peut soumettre des réponses
+        if not can_access_test(test_data):
+            return jsonify({'success': False, 'error': 'Accès non autorisé'}), 403
+
         # Vérifier si l'utilisateur peut repasser le test
         user_id = session['uid']
         attempts_query = db.collection('test_attempts') \
@@ -895,7 +933,9 @@ def submit_technical_test(test_id):
 
         for question in test_data.get('questions', []):
             user_answer = next(
-                (a for a in answers if a.get('question_id') == question.get('id')),
+                # Comparaison en texte : le formulaire envoie les ids sous forme de clés d'objet (texte)
+                # alors que les questions créées manuellement ont un id numérique
+                (a for a in answers if str(a.get('question_id')) == str(question.get('id'))),
                 None
             )
 
@@ -909,19 +949,21 @@ def submit_technical_test(test_id):
         percentage = (total_score / max_score * 100) if max_score > 0 else 0
         passed = percentage >= test_data.get('passing_score', 70)
 
-        # Enregistrer la tentative
+        # Enregistrer la tentative (nom et email pris sur le profil : la session ne les contient pas)
+        candidate_doc = db.collection('users').document(user_id).get()
+        candidate = candidate_doc.to_dict() if candidate_doc.exists else {}
         attempt_doc = {
             'test_id': test_id,
             'job_id': test_data.get('job_id'),
             'candidate_id': user_id,
-            'candidate_name': session.get('name', ''),
-            'candidate_email': session.get('email', ''),
+            'candidate_name': display_name(candidate, ''),
+            'candidate_email': candidate.get('email', ''),
             'score': total_score,
             'max_score': max_score,
             'percentage': percentage,
             'passed': passed,
             'results': results,
-            'submitted_at': datetime.now(),
+            'submitted_at': datetime.now(timezone.utc),
             'duration': data.get('duration', 0)  # temps passé en minutes
         }
 
@@ -1105,11 +1147,10 @@ def get_test_attempts(test_id):
         # Récupérer les tentatives
         attempts_query = db.collection('test_attempts') \
             .where('test_id', '==', test_id) \
-            .order_by('submitted_at', direction='DESCENDING') \
             .stream()
 
         attempts = []
-        for doc in attempts_query:
+        for doc in sort_docs_desc(attempts_query, 'submitted_at'):
             attempt_data = doc.to_dict()
             attempt_data['id'] = doc.id
 
@@ -1144,11 +1185,10 @@ def get_company_technical_tests():
         # Récupérer tous les tests de l'entreprise
         tests_query = db.collection('technical_tests') \
             .where('company_id', '==', session['uid']) \
-            .order_by('created_at', direction='DESCENDING') \
             .stream()
 
         tests = []
-        for doc in tests_query:
+        for doc in sort_docs_desc(tests_query, 'created_at'):
             test_data = doc.to_dict()
             test_data['id'] = doc.id
 
@@ -1270,7 +1310,7 @@ def evaluate_with_ai(test_data, attempt_data):
 
         # Trouver la réponse du candidat
         user_answer = next(
-            (a for a in answers if a.get('question_id') == question.get('id')),
+            (a for a in answers if str(a.get('question_id')) == str(question.get('id'))),
             None
         )
 
@@ -1612,11 +1652,10 @@ def get_available_tests_for_job(job_id):
         tests_query = db.collection('technical_tests') \
             .where('job_id', '==', job_id) \
             .where('status', '==', 'active') \
-            .order_by('created_at', direction='DESCENDING') \
             .stream()
 
         tests = []
-        for doc in tests_query:
+        for doc in sort_docs_desc(tests_query, 'created_at'):
             test_data = doc.to_dict()
             test_data['id'] = doc.id
             tests.append(test_data)

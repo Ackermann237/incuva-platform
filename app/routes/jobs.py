@@ -7,6 +7,8 @@ import boto3
 from botocore.exceptions import ClientError
 from werkzeug.utils import secure_filename
 from flask import current_app
+from ..user_utils import display_name
+from .notifications import create_notification
 
 
 jobs_bp = Blueprint('jobs', __name__, url_prefix='/jobs')
@@ -108,6 +110,14 @@ def apply_job_api(job_id):
             experience,
             phone
         )
+        job = job_doc.to_dict()
+        if job.get('company_id'):
+            create_notification(
+                g.db, job['company_id'], 'new_application', 'Nouvelle candidature',
+                f"{display_name(user_doc.to_dict(), default='Un candidat')} a postulé à votre offre "
+                f"« {job.get('title', 'Offre sans titre')} ».",
+                data={'application_id': application_id, 'job_id': job_id, 'candidate_id': user_id},
+            )
         return jsonify({
             'success': True,
             'message': 'Candidature soumise avec succès!',
@@ -414,22 +424,18 @@ def update_application_status(application_id):
         # ================= NOUVEAU =================
         # Créer une notification pour le candidat si la candidature est acceptée ou refusée
         if status in ['accepted', 'rejected']:
-            notification_data = {
-                'user_id': application['candidate_id'],
-                'type': 'application_status',
-                'title': f'Candidature {status}',
-                'message': f'Votre candidature pour "{application.get("job_title", "le poste")}" a été {status}.',
-                'data': {
+            status_fr = 'acceptée' if status == 'accepted' else 'refusée'
+            create_notification(
+                g.db, application['candidate_id'], 'application_status',
+                f'Candidature {status_fr}',
+                f'Votre candidature pour "{application.get("job_title", "le poste")}" a été {status_fr}.',
+                data={
                     'application_id': application_id,
                     'job_id': application['job_id'],
                     'company_id': application['company_id'],
                     'status': status
                 },
-                'read': False,
-                'created_at': datetime.now()
-            }
-            g.db.collection('notifications').add(notification_data)
-            logger.info(f"Notification créée pour l'application {application_id} - statut: {status}")
+            )
         # ================= FIN NOUVEAU =================
 
         # Update metrics only for company-related actions
@@ -468,7 +474,7 @@ def api_get_job_applications(job_id):
             user_doc = g.db.collection('users').document(data['candidate_id']).get()
             if user_doc.exists:
                 user_data = user_doc.to_dict()
-                data['candidate_name'] = f"{user_data.get('firstName', '')} {user_data.get('lastName', '')}".strip()
+                data['candidate_name'] = display_name(user_data, "Utilisateur inconnu")
             else:
                 data['candidate_name'] = "Utilisateur inconnu"
             # Formatage de la date
@@ -575,6 +581,39 @@ def api_my_applications():
                 app['applied_at'] = app['applied_at'].to_datetime().isoformat()
             applications.append(app)
         return jsonify({'success': True, 'applications': applications})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@jobs_bp.route('/api/application/<application_id>', methods=['GET'])
+def api_application_detail(application_id):
+    """Détail d'une candidature (candidat concerné ou entreprise destinataire), avec les infos de l'offre."""
+    if 'uid' not in session:
+        return jsonify({'success': False, 'error': 'Non authentifié'}), 401
+
+    try:
+        doc = g.db.collection('applications').document(application_id).get()
+        if not doc.exists:
+            return jsonify({'success': False, 'error': 'Candidature non trouvée'}), 404
+
+        app = doc.to_dict()
+        if session['uid'] not in (app.get('candidate_id'), app.get('company_id')):
+            return jsonify({'success': False, 'error': 'Accès non autorisé'}), 403
+
+        app['application_id'] = doc.id
+        job_doc = g.db.collection('jobs').document(app['job_id']).get() if app.get('job_id') else None
+        if job_doc and job_doc.exists:
+            job = job_doc.to_dict()
+            app['job_title'] = job.get('title', 'Offre inconnue')
+            app['description'] = job.get('description', '')
+            company_doc = g.db.collection('users').document(job['company_id']).get()
+            app['company_name'] = company_doc.to_dict().get('companyName', 'Entreprise') if company_doc.exists else 'Entreprise'
+
+        for key, value in list(app.items()):
+            if hasattr(value, 'isoformat'):
+                app[key] = value.isoformat()
+
+        return jsonify({'success': True, 'application': app})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -902,21 +941,16 @@ def quick_apply_job(job_id):
         application_ref.set(application_data)
 
         # Créer une notification pour l'entreprise
-        notification_data = {
-            'user_id': job['company_id'],
-            'type': 'new_application',
-            'title': 'Nouvelle candidature rapide',
-            'message': f"{application_data['candidate_name']} a postulé à votre offre '{job['title']}' en un clic.",
-            'data': {
+        create_notification(
+            g.db, job['company_id'], 'new_application', 'Nouvelle candidature rapide',
+            f"{application_data['candidate_name']} a postulé à votre offre '{job['title']}' en un clic.",
+            data={
                 'application_id': application_id,
                 'job_id': job_id,
                 'candidate_id': user_id,
                 'is_quick_apply': True
             },
-            'read': False,
-            'created_at': datetime.now()
-        }
-        g.db.collection('notifications').add(notification_data)
+        )
 
         # Mettre à jour les métriques
         g.recruitment_service.update_metrics(job['company_id'])

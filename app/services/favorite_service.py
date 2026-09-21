@@ -13,20 +13,13 @@ class FavoriteService:
         """Add a talent to the company's favorites if not already added."""
         logger.debug(f"Attempting to add favorite: company_id={company_id}, talent_id={talent_id}")
         try:
-            # Batch check for provider existence and favorite status
-            batch = self.db.batch()
-            provider_ref = self.db.collection('providers').document(talent_id)
-            favorite_query = self.db.collection('favorites').where('company_id', '==', company_id).where('talent_id',
-                                                                                                         '==',
-                                                                                                         talent_id).limit(
-                1)
+            # Un talent est un compte particulier (collection `users`), plus un prestataire (`providers`)
+            talent_doc = self.db.collection('users').document(talent_id).get()
+            favorite_docs = self.db.collection('favorites').where('company_id', '==', company_id) \
+                .where('talent_id', '==', talent_id).limit(1).get()
 
-            # Execute queries
-            provider_doc = provider_ref.get()
-            favorite_docs = favorite_query.get()
-
-            if not provider_doc.exists:
-                logger.error(f"Talent ID {talent_id} not found in providers collection")
+            if not talent_doc.exists or talent_doc.to_dict().get('accountType') != 'individual':
+                logger.error(f"Talent ID {talent_id} not found among individual users")
                 raise Exception(f"Talent with ID {talent_id} not found")
 
             if len(favorite_docs) > 0:
@@ -83,44 +76,26 @@ class FavoriteService:
             talents = []
             for doc in favorites_docs:
                 data = doc.to_dict()
-                talent = g.talent_service.get_talent_by_id(data['talent_id'])
-                if talent:
-                    # Conversion sécurisée des champs
-                    talent_data = {
-                        'id': talent['id'],
-                        'name': talent.get('name', ''),
-                        'email': talent.get('email', ''),
-                        'profileImageUrl': talent.get('profileImageUrl', ''),
-                        'userCountry': talent.get('userCountry', ''),
-                        'title': talent.get('title', ''),
-                        'originalTitle': talent.get('originalTitle', ''),
-                        'description': talent.get('description', ''),
-                        'location': talent.get('location', ''),
-                        'country': talent.get('country', ''),
-                        'price': talent.get('price', 0),
-                        'currency': talent.get('currency', ''),
-                        'user_uid': talent.get('user_uid', '')  # Important pour le chat
-                    }
+                # Les talents sont des comptes particuliers (collection `users`), même format que le marché des talents
+                user_doc = self.db.collection('users').document(data['talent_id']).get()
+                if not user_doc.exists:
+                    continue
 
-                    # Gestion des GeoPoint
-                    coordinates = talent.get('coordinates')
-                    if isinstance(coordinates, firestore.GeoPoint):
-                        talent_data['coordinates'] = {
-                            'latitude': round(coordinates.latitude, 4),
-                            'longitude': round(coordinates.longitude, 4)
-                        }
-
-                    # Gestion des dates (si ce sont des Timestamp)
-                    for field in ['startTime', 'endTime', 'registrationDate']:
-                        if field in talent and talent[field]:
-                            if isinstance(talent[field], firestore.server_timestamp.ServerTimestamp):
-                                talent_data[field] = 'Non spécifié'
-                            elif hasattr(talent[field], 'strftime'):
-                                talent_data[field] = talent[field].strftime('%d/%m/%Y')
-                            else:
-                                talent_data[field] = str(talent[field])
-
-                    talents.append(talent_data)
+                user = user_doc.to_dict()
+                bio = user.get('bio') or ''
+                title = (bio[:60] + '...') if bio else 'Candidat disponible'
+                talents.append({
+                    'id': user_doc.id,
+                    'name': f"{user.get('first_name', '')} {user.get('name', '')}".strip() or 'Anonyme',
+                    'email': user.get('email', ''),
+                    'profileImageUrl': user.get('profileImageUrl', ''),
+                    'title': title,
+                    'originalTitle': title,
+                    'location': f"{user.get('location', 'Non renseignée')}, {user.get('country', '')}",
+                    'country': user.get('country', ''),
+                    'skills': user.get('skills', [])[:8],
+                    'user_uid': user_doc.id  # Important pour le chat
+                })
 
             logger.info(f"Fetched {len(talents)} favorites for company {company_id}")
             return talents

@@ -3,6 +3,8 @@ import logging
 import re
 from firebase_admin import firestore
 from ..firebase.init_firebase import db
+from ..query_utils import sort_docs_desc
+from ..user_utils import display_name
 
 logger = logging.getLogger(__name__)
 hr_bp = Blueprint('hr', __name__, url_prefix='/hr')
@@ -115,8 +117,8 @@ def talent_market_api():
             ):
                 continue
 
-            # Calcul d'une note moyenne fictive (à partir des expériences (ou tu peux ajouter un champ rating plus tard)
-            rating = 4.5  # À remplacer par un vrai système de notation plus tard
+            # Pas de système de notation pour l'instant : on n'affiche une note que si le profil en contient une
+            rating = data.get('rating')
 
             talents.append({
                 'id': uid,
@@ -124,7 +126,7 @@ def talent_market_api():
                 'name': f"{data.get('first_name', '')} {data.get('name', '')}".strip() or "Anonyme",
                 'title': data.get('bio', '')[:60] + "..." if data.get('bio') else "Candidat disponible",
                 'location': f"{data.get('location', 'Non renseignée')}, {data.get('country', '')}",
-                'rating': round(rating, 1),
+                'rating': round(float(rating), 1) if rating is not None else None,
                 'skills': data.get('skills', [])[:8],  # Top 8 compétences
                 'profileImageUrl': data.get('profileImageUrl', '/static/images/user_avatar.jpg'),
                 'cvUrl': data.get('cvUrl'),
@@ -212,7 +214,7 @@ def talent_detail_api(talent_id):
             'email': data.get('email', ''),
             'phone': data.get('phone', ''),
             'location': f"{data.get('location', 'Non renseignée')}, {data.get('country', '')}".strip(),
-            'rating': float(data.get('rating', 4.5)) if data.get('rating') is not None else 4.5,
+            'rating': float(data['rating']) if data.get('rating') is not None else None,
             'reviewCount': data.get('reviewCount', 0),
             'skills': data.get('skills', []),  # Doit être une liste de strings
             'languages': languages,  # ← Format corrigé et unifié
@@ -326,16 +328,15 @@ def agreements_api():
     try:
         contracts_ref = db.collection('contracts') \
             .where('company_id', '==', session['uid']) \
-            .order_by('created_at', direction=firestore.Query.DESCENDING) \
             .stream()
 
         agreements = []
-        for contract_doc in contracts_ref:
+        for contract_doc in sort_docs_desc(contracts_ref, 'created_at'):
             contract_data = contract_doc.to_dict()
             contract_data['contract_id'] = contract_doc.id
             # Récupérer le nom du candidat
             candidate_doc = db.collection('users').document(contract_data['candidate_id']).get()
-            contract_data['candidate_name'] = candidate_doc.to_dict().get('name', 'Anonyme') if candidate_doc.exists else 'Anonyme'
+            contract_data['candidate_name'] = display_name(candidate_doc.to_dict()) if candidate_doc.exists else 'Anonyme'
             agreements.append(contract_data)
 
         return jsonify({'success': True, 'agreements': agreements})
@@ -353,17 +354,16 @@ def rejections_api():
         interviews_ref = db.collection('interviews') \
             .where('company_id', '==', session['uid']) \
             .where('status', '==', 'not_selected') \
-            .order_by('datetime', direction=firestore.Query.DESCENDING) \
             .stream()
 
         rejections = []
-        for interview_doc in interviews_ref:
+        for interview_doc in sort_docs_desc(interviews_ref, 'datetime'):
             interview_data = interview_doc.to_dict()
             interview_data['interview_id'] = interview_doc.id
 
             # Récupérer le nom du candidat
             candidate_doc = db.collection('users').document(interview_data['candidate_id']).get()
-            interview_data['candidate_name'] = candidate_doc.to_dict().get('name', 'Anonyme') if candidate_doc.exists else 'Anonyme'
+            interview_data['candidate_name'] = display_name(candidate_doc.to_dict()) if candidate_doc.exists else 'Anonyme'
 
             # Récupérer le titre du poste
             job_doc = db.collection('jobs').document(interview_data['job_id']).get()

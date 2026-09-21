@@ -6,6 +6,7 @@ import logging
 from functools import wraps
 from ..firebase.init_firebase import db
 from ..ai.manage import get_ai_manager
+from ..ai import planning_optimizer
 
 logger = logging.getLogger(__name__)
 planning_bp = Blueprint('planning', __name__, url_prefix='/api/planning')
@@ -76,9 +77,6 @@ def get_planning():
         # Construire la requête
         query = db.collection('planning').where('company_id', '==', company_id)
 
-        if start_date and end_date:
-            query = query.where('date', '>=', start_date).where('date', '<=', end_date)
-
         if department and department != 'all':
             query = query.where('department', '==', department)
 
@@ -90,6 +88,11 @@ def get_planning():
         for doc in query.stream():
             data = doc.to_dict()
             data['id'] = doc.id
+
+            # Filtre de période côté Python : un filtre d'intervalle sur `date` combiné aux filtres d'égalité
+            # exige un index composite Firestore (les dates sont des textes AAAA-MM-JJ, donc comparables)
+            if start_date and end_date and not (start_date <= str(data.get('date', ''))[:10] <= end_date):
+                continue
 
             # Récupérer les infos de l'employé
             if 'employee_id' in data:
@@ -384,45 +387,31 @@ def get_planning_stats():
 @planning_bp.route('/optimize', methods=['POST'])
 @company_required
 def optimize_planning():
-    """Générer un planning optimisé avec IA"""
+    """Propose un planning optimisé pour une semaine (rien n'est enregistré : voir /optimize/apply).
+
+    Paramètres facultatifs : week_start (AAAA-MM-JJ), start_time, end_time, break_minutes, weekly_hours,
+    min_staff, fill_to_target.
+    """
     try:
-        company_id = session['uid']
-        data = request.get_json()
-
-        # Récupérer les employés avec leurs contraintes
-        employees_ref = db.collection('employees').where('company_id', '==', company_id)
-        employees = []
-        for doc in employees_ref.stream():
-            emp_data = doc.to_dict()
-            emp_data['id'] = doc.id
-
-            # Récupérer les compétences et disponibilités
-            if 'candidate_id' in emp_data:
-                candidate_doc = db.collection('users').document(emp_data['candidate_id']).get()
-                if candidate_doc.exists:
-                    candidate_data = candidate_doc.to_dict()
-                    emp_data['skills'] = candidate_data.get('skills', [])
-
-            employees.append(emp_data)
-
-        # Récupérer le gestionnaire IA
-        ai_manager = get_ai_manager('planning')
-
-        # Générer le planning optimisé
-        optimization_params = {
-            'employees': employees,
-            'constraints': data.get('constraints', {})
-        }
-
-        optimized_planning = ai_manager.generate_optimal_planning(**optimization_params)
-
-        return jsonify({
-            'success': True,
-            'planning': optimized_planning.get('planning', []),
-            'recommendations': optimized_planning.get('recommendations', []),
-            'statistics': optimized_planning.get('statistics', {})
-        })
-
+        proposal = planning_optimizer.optimize(db, session['uid'], request.get_json(silent=True) or {})
+        return jsonify({'success': True, 'proposal': proposal})
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        logger.error(f"Erreur lors de l'optimisation du planning: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Erreur lors de l'optimisation du planning: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': "Erreur lors de l'optimisation du planning"}), 500
+
+
+@planning_bp.route('/optimize/apply', methods=['POST'])
+@company_required
+def apply_optimized_planning():
+    """Enregistre les shifts d'une proposition validée par l'utilisateur."""
+    try:
+        body = request.get_json(silent=True) or {}
+        result = planning_optimizer.apply_shifts(db, session['uid'], body.get('shifts'))
+        return jsonify({'success': True, **result})
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Erreur lors de l'application du planning: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': "Erreur lors de l'enregistrement du planning"}), 500

@@ -1,6 +1,7 @@
 from firebase_admin import firestore
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
+from ..user_utils import display_name
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class RecruitmentService:
                 'job_id': job_id,
                 'company_id': company_id,
                 'status': 'pending',
-                'submitted_at': datetime.now(),
+                'submitted_at': datetime.now(timezone.utc),  # UTC explicite : Firestore lit une date sans fuseau comme UTC
                 'resume_url': resume_url,
                 'urgency': 'normal',  # Default, can be set based on logic
                 'motivation': motivation,
@@ -88,6 +89,8 @@ class RecruitmentService:
                                                                                                                              data[
                                                                                                                                  'candidate_id'][
                                                                                                                              :8]
+                if candidate_doc.exists:
+                    data['candidate_name'] = display_name(candidate_doc.to_dict(), data['candidate_name'])
                 logger.debug(
                     f"Retrieved application: ID={data['application_id']}, Job={data['job_title']}, Candidate={data['candidate_name']}, Status={data['status']}")
                 applications.append(data)
@@ -123,6 +126,8 @@ class RecruitmentService:
                                                                                                                              data[
                                                                                                                                  'candidate_id'][
                                                                                                                              :8]
+                if candidate_doc.exists:
+                    data['candidate_name'] = display_name(candidate_doc.to_dict(), data['candidate_name'])
                 logger.debug(
                     f"Retrieved application: ID={data['application_id']}, Job={data['job_title']}, Candidate={data['candidate_name']}, Status={data['status']}")
                 applications.append(data)

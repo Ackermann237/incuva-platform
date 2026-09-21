@@ -5,6 +5,7 @@ import datetime
 import boto3
 from flask import current_app
 from werkzeug.utils import secure_filename
+from ..user_utils import display_name
 
 logger = logging.getLogger(__name__)
 
@@ -322,8 +323,7 @@ class MessagingService:
             data = doc.to_dict()
             other_participant = [p for p in data['participants'] if p != user_id][0]
             other_user_doc = self.db.collection('users').document(other_participant).get()
-            other_name = other_user_doc.to_dict().get('name', other_user_doc.to_dict().get('companyName',
-                                                                                           'Anonyme')) if other_user_doc.exists else 'Anonyme'
+            other_name = display_name(other_user_doc.to_dict()) if other_user_doc.exists else 'Anonyme'
             last_message = data.get('lastMessage', '')
             if data.get('lastMessageType') == 'image':
                 last_message = 'Image'
@@ -342,6 +342,7 @@ class MessagingService:
             chats.append({
                 'chatId': doc.id,
                 'otherParticipantName': other_name,
+                'otherParticipantId': other_participant,
                 'lastMessage': last_message,
                 'lastMessageTime': data.get('lastMessageTime', datetime.datetime.now()),
                 'unreadCount': data.get(f'unreadCount_{user_id}', 0),

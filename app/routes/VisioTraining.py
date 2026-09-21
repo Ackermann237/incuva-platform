@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 from ..ai.copilote import call_ia
 from ..firebase.init_firebase import db
+from ..query_utils import sort_docs_desc
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -506,12 +507,10 @@ def get_visio_history():
         # Récupérer les sessions de l'utilisateur
         sessions_ref = db.collection('visio_sessions') \
             .where('user_id', '==', session['uid']) \
-            .order_by('created_at', direction='DESCENDING') \
-            .limit(20) \
             .stream()
 
         sessions = []
-        for doc in sessions_ref:
+        for doc in sort_docs_desc(sessions_ref, 'created_at')[:20]:
             session_data = doc.to_dict()
             session_data['id'] = doc.id
 

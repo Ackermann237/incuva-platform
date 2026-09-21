@@ -1,0 +1,16 @@
+
+# Secrets et dependances (ne jamais versionner)
+.env
+.env.local
+incuva_cred.json
+*_cred.json
+serviceAccount*.json
+.secret_key
+venv/
+venv_local/
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+dist/
+*.log

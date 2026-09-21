@@ -10,7 +10,9 @@ from functools import wraps
 
 from .contracts import generate_first_payslip
 from ..ai.payroll_ia import PayrollAIManager
+from ..ai import payroll_analysis, llm
 from ..firebase.init_firebase import db
+from ..query_utils import latest_doc, sort_docs_desc
 from ..ai.manage import get_ai_manager, HFChatClient
 
 logger = logging.getLogger(__name__)
@@ -32,21 +34,16 @@ def company_required(f):
 @payroll_bp.route('/ai/analyze_payroll', methods=['POST'])
 @company_required
 def analyze_payroll_ai():
+    """Analyse complète de la paie de l'entreprise.
+
+    Tout est recalculé côté serveur à partir des bulletins réels (les données envoyées par le navigateur sont ignorées) :
+    indicateurs, anomalies, score de santé, projection, comparaison avec la dernière analyse, puis commentaire de l'IA.
+    """
     try:
-        payload = request.get_json() or {}
-        payroll_data = payload.get('payroll_data')
-
-        if not payroll_data:
-            return jsonify({'success': False, 'error': 'Données de paie manquantes'}), 400
-
-        payroll_ai = get_ai_manager("payroll")
-        result = payroll_ai.analyze_payroll_trends(payroll_data)
-
-        return jsonify(result)
-
+        return jsonify({'success': True, 'analysis': payroll_analysis.analyze(db, session['uid'])})
     except Exception as e:
-        logger.error(f"Erreur IA Paie: {str(e)}")
-        return jsonify({'success': False, 'error': 'Erreur lors de l’analyse IA'}), 500
+        logger.error(f"Erreur IA Paie: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': "Erreur lors de l'analyse de la paie"}), 500
 
 
 
@@ -78,12 +75,11 @@ def get_employees_for_payroll():
 
             # Récupérer le dernier bulletin si existant
             payslip_ref = db.collection('payslips') \
-                .where('employee_id', '==', doc.id) \
-                .order_by('period_end', direction=firestore.Query.DESCENDING) \
-                .limit(1)
+                .where('employee_id', '==', doc.id)
 
             last_payslip = None
-            for payslip in payslip_ref.stream():
+            payslip = latest_doc(payslip_ref, 'period_end')
+            if payslip:
                 last_payslip = payslip.to_dict()
                 last_payslip['id'] = payslip.id
 
@@ -119,20 +115,20 @@ def get_payslips():
         if employee_id and employee_id != 'all':
             query = query.where('employee_id', '==', employee_id)
 
-        if period_start and period_end:
-            query = query.where('period_start', '>=', period_start) \
-                .where('period_end', '<=', period_end)
-
         if status and status != 'all':
             query = query.where('status', '==', status)
 
-        # Trier par période (plus récent en premier)
-        query = query.order_by('period_end', direction=firestore.Query.DESCENDING)
-
+        # Trier par période (plus récent en premier), côté Python : pas d'index composite Firestore requis
         payslips = []
-        for doc in query.stream():
+        for doc in sort_docs_desc(query.stream(), 'period_end'):
             data = doc.to_dict()
             data['id'] = doc.id
+
+            # Filtre de période côté Python (deux filtres d'intervalle sur des champs différents : pas d'index possible)
+            if period_start and period_end and not (
+                    str(data.get('period_start', ''))[:10] >= period_start
+                    and str(data.get('period_end', ''))[:10] <= period_end):
+                continue
 
             # Récupérer les infos de l'employé
             if 'employee_id' in data:
@@ -440,6 +436,31 @@ def approve_payslip(payslip_id):
 
     except Exception as e:
         logger.error(f"Erreur lors de l'approbation du bulletin: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@payroll_bp.route('/payslip/<payslip_id>', methods=['DELETE'])
+@company_required
+def delete_payslip(payslip_id):
+    """Supprimer un bulletin en brouillon (un bulletin approuvé ou payé est conservé)"""
+    try:
+        payslip_ref = db.collection('payslips').document(payslip_id)
+        payslip_doc = payslip_ref.get()
+        if not payslip_doc.exists:
+            return jsonify({'success': False, 'error': 'Bulletin non trouvé'}), 404
+
+        payslip_data = payslip_doc.to_dict()
+        if payslip_data.get('company_id') != session['uid']:
+            return jsonify({'success': False, 'error': 'Accès non autorisé'}), 403
+
+        if payslip_data.get('status') != 'draft':
+            return jsonify({'success': False, 'error': 'Seul un bulletin en brouillon peut être supprimé'}), 400
+
+        payslip_ref.delete()
+        return jsonify({'success': True, 'message': 'Bulletin supprimé'})
+
+    except Exception as e:
+        logger.error(f"Erreur lors de la suppression du bulletin: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -751,7 +772,7 @@ def setup_auto_payroll(employee_id):
             'employee_id': employee_id,
             'company_id': company_id,
             'contract_type': contract_type,
-            'gross_salary': float(salary),
+            'gross_salary': round(float(salary) / 12, 2),  # salaire mensuel (l'employé a un salaire annuel)
             'period_start': period_start,
             'period_end': period_end,
             'payment_date': payment_date,
@@ -797,11 +818,10 @@ def get_all_payslips_for_ai():
 
         # Récupérer tous les bulletins sans filtre
         payslips_ref = db.collection('payslips') \
-            .where('company_id', '==', company_id) \
-            .order_by('period_end', direction=firestore.Query.DESCENDING)
+            .where('company_id', '==', company_id)
 
         payslips = []
-        for doc in payslips_ref.stream():
+        for doc in sort_docs_desc(payslips_ref.stream(), 'period_end'):
             data = doc.to_dict()
             data['id'] = doc.id
 
@@ -830,68 +850,20 @@ def get_all_payslips_for_ai():
 def query_payroll_ai():
     """Répondre aux questions spécifiques sur la paie"""
     try:
-        payload = request.get_json() or {}
-        question = payload.get('question')
-        context = payload.get('context', {})
-
+        payload = request.get_json(silent=True) or {}
+        question = (payload.get('question') or '').strip()
         if not question:
             return jsonify({'success': False, 'error': 'Question manquante'}), 400
 
-        # Récupérer les données nécessaires
-        company_id = session['uid']
+        # Le modèle répond à partir des indicateurs recalculés sur les vrais bulletins de l'entreprise
+        answer = payroll_analysis.answer_question(db, session['uid'], question)
+        return jsonify({'success': True, 'answer': answer})
 
-        # Récupérer les bulletins récents pour le contexte
-        payslips_ref = db.collection('payslips') \
-            .where('company_id', '==', company_id) \
-            .order_by('period_end', direction=firestore.Query.DESCENDING) \
-            .limit(20)
-
-        recent_payslips = []
-        for doc in payslips_ref.stream():
-            data = doc.to_dict()
-            data['id'] = doc.id
-            recent_payslips.append(data)
-
-        # Préparer le contexte avec une fonction locale
-        def summarize_payslips(payslips):
-            """Résume les bulletins pour le contexte IA"""
-            summary = {
-                'total': len(payslips),
-                'by_status': {},
-                'total_gross': 0,
-                'total_net': 0,
-                'recent_periods': []
-            }
-
-            for payslip in payslips[:5]:  # 5 plus récents
-                status = payslip.get('status', 'unknown')
-                summary['by_status'][status] = summary['by_status'].get(status, 0) + 1
-                summary['total_gross'] += payslip.get('gross_salary', 0)
-                summary['total_net'] += payslip.get('net_salary', 0)
-
-                if 'period_end' in payslip:
-                    summary['recent_periods'].append(payslip.get('period_end'))
-
-            return summary
-
-        ai_context = {
-            'company_id': company_id,
-            'recent_payslips_count': len(recent_payslips),
-            'recent_payslips_summary': summarize_payslips(recent_payslips),
-            'user_context': context
-        }
-
-        # Utiliser l'IA pour répondre
-        payroll_ai = get_ai_manager("payroll")
-        answer = payroll_ai.answer_payroll_question(question, ai_context)
-
-        return jsonify({
-            'success': True,
-            'answer': answer
-        })
-
+    except llm.LLMUnavailable as e:
+        logger.error(f"Question paie : IA indisponible ({e})")
+        return jsonify({'success': False, 'error': "L'assistant IA est momentanément indisponible."}), 503
     except Exception as e:
-        logger.error(f"Erreur query IA Paie: {str(e)}")
+        logger.error(f"Erreur query IA Paie: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': 'Erreur lors de la réponse IA'}), 500
 
 

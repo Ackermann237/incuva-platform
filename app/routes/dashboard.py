@@ -10,6 +10,8 @@ from ..services.recruitment_service import RecruitmentService
 from ..services.favorite_service import FavoriteService
 from ..ai.copilote import generate_bi_insights
 from ..firebase.init_firebase import db
+from ..query_utils import latest_doc
+from ..user_utils import display_name
 import logging
 
 logger = logging.getLogger(__name__)
@@ -78,7 +80,7 @@ def user_dashboard_api():
             contract_data = contract_doc.to_dict()
             contract_data['contract_id'] = contract_doc.id
             candidate_doc = db.collection('users').document(contract_data['candidate_id']).get()
-            contract_data['candidate_name'] = candidate_doc.to_dict().get('name', 'Anonyme') if candidate_doc.exists else 'Anonyme'
+            contract_data['candidate_name'] = display_name(candidate_doc.to_dict()) if candidate_doc.exists else 'Anonyme'
             agreements.append(contract_data)
         response_data['agreements'] = agreements
         response_data['agreements_count'] = len(agreements)
@@ -92,7 +94,7 @@ def user_dashboard_api():
             interview_data['interview_id'] = interview_doc.id
 
             candidate_doc = db.collection('users').document(interview_data['candidate_id']).get()
-            interview_data['candidate_name'] = candidate_doc.to_dict().get('name', 'Anonyme') if candidate_doc.exists else 'Anonyme'
+            interview_data['candidate_name'] = display_name(candidate_doc.to_dict()) if candidate_doc.exists else 'Anonyme'
 
             job_doc = db.collection('jobs').document(interview_data['job_id']).get()
             interview_data['job_title'] = job_doc.to_dict().get('title', 'Poste inconnu') if job_doc.exists else 'Poste inconnu'
@@ -241,7 +243,7 @@ def data_analysis_api():
             app_data = app.to_dict()
             app_data['application_id'] = app.id
             candidate_doc = db.collection('users').document(app_data['candidate_id']).get()
-            app_data['candidate_name'] = candidate_doc.to_dict().get('name', 'Anonyme') if candidate_doc.exists else 'Anonyme'
+            app_data['candidate_name'] = display_name(candidate_doc.to_dict()) if candidate_doc.exists else 'Anonyme'
             job_doc = db.collection('jobs').document(app_data['job_id']).get()
             app_data['position'] = job_doc.to_dict().get('title', 'Poste inconnu') if job_doc.exists else 'Poste inconnu'
             applications.append(app_data)
@@ -253,7 +255,7 @@ def data_analysis_api():
             intv_data = intv.to_dict()
             intv_data['interview_id'] = intv.id
             candidate_doc = db.collection('users').document(intv_data['candidate_id']).get()
-            intv_data['candidate_name'] = candidate_doc.to_dict().get('name', 'Anonyme') if candidate_doc.exists else 'Anonyme'
+            intv_data['candidate_name'] = display_name(candidate_doc.to_dict()) if candidate_doc.exists else 'Anonyme'
             job_doc = db.collection('jobs').document(intv_data['job_id']).get()
             intv_data['job_title'] = job_doc.to_dict().get('title', 'Poste inconnu') if job_doc.exists else 'Poste inconnu'
             interviews.append(intv_data)
@@ -265,7 +267,7 @@ def data_analysis_api():
             contr_data = contr.to_dict()
             contr_data['contract_id'] = contr.id
             candidate_doc = db.collection('users').document(contr_data['candidate_id']).get()
-            contr_data['candidate_name'] = candidate_doc.to_dict().get('name', 'Anonyme') if candidate_doc.exists else 'Anonyme'
+            contr_data['candidate_name'] = display_name(candidate_doc.to_dict()) if candidate_doc.exists else 'Anonyme'
             job_id = contr_data.get('job_id')
             if job_id:
                 job_doc = db.collection('jobs').document(job_id).get()
@@ -322,6 +324,22 @@ def data_analysis_api():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def _to_naive_datetime(value):
+    """Date Firestore, datetime ou texte ISO (« 2026-09-25 10:00 ») -> datetime sans fuseau, ou None."""
+    if value is None:
+        return None
+    if hasattr(value, 'to_datetime'):
+        value = value.to_datetime()
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None)
+    return None
+
+
 @dashboard_bp.route('/recent_activity', methods=['GET'])
 def get_recent_activity():
     if 'uid' not in session or session.get('account_type') != 'company':
@@ -334,20 +352,19 @@ def get_recent_activity():
     try:
         # 1. Dernière candidature
         apps_ref = db.collection('applications')\
-            .where('company_id', '==', company_id)\
-            .order_by('applied_at', direction=firestore.Query.DESCENDING)\
-            .limit(1)
-        for doc in apps_ref.stream():
+            .where('company_id', '==', company_id)
+        for doc in filter(None, [latest_doc(apps_ref, 'submitted_at')]):
             app = doc.to_dict()
             candidate_doc = db.collection('users').document(app['candidate_id']).get()
             candidate_name = "Anonyme"
             if candidate_doc.exists:
                 u = candidate_doc.to_dict()
-                candidate_name = f"{u.get('firstName', '')} {u.get('lastName', '')}".strip() or u.get('name', 'Anonyme')
+                candidate_name = display_name(u)
 
             time_ago = "Maintenant"
-            if app.get('applied_at'):
-                delta = now - app['applied_at'].to_datetime().replace(tzinfo=None)
+            applied_at = _to_naive_datetime(app.get('submitted_at'))
+            if applied_at:
+                delta = now - applied_at
                 if delta.days > 0:
                     time_ago = f"Il y a {delta.days} jour{'s' if delta.days > 1 else ''}"
                 elif delta.seconds > 3600:
@@ -360,6 +377,7 @@ def get_recent_activity():
                 'title': 'Nouvelle candidature reçue',
                 'candidate': candidate_name,
                 'time': time_ago,
+                'sort_at': applied_at or datetime.min,
                 'icon': 'UserCheck',
                 'color': 'text-blue-600 bg-blue-50'
             })
@@ -367,20 +385,19 @@ def get_recent_activity():
         # 2. Dernier entretien programmé
         interviews_ref = db.collection('interviews')\
             .where('company_id', '==', company_id)\
-            .where('status', '==', 'scheduled')\
-            .order_by('datetime', direction=firestore.Query.DESCENDING)\
-            .limit(1)
-        for doc in interviews_ref.stream():
+            .where('status', '==', 'scheduled')
+        for doc in filter(None, [latest_doc(interviews_ref, 'datetime')]):
             iv = doc.to_dict()
             candidate_doc = db.collection('users').document(iv['candidate_id']).get()
             candidate_name = "Anonyme"
             if candidate_doc.exists:
                 u = candidate_doc.to_dict()
-                candidate_name = f"{u.get('firstName', '')} {u.get('lastName', '')}".strip() or u.get('name', 'Anonyme')
+                candidate_name = display_name(u)
 
             time_ago = "Bientôt"
-            if iv.get('datetime'):
-                delta = iv['datetime'].to_datetime().replace(tzinfo=None) - now
+            interview_at = _to_naive_datetime(iv.get('datetime'))
+            if interview_at:
+                delta = interview_at - now
                 if delta.days > 0:
                     time_ago = f"Dans {delta.days} jour{'s' if delta.days > 1 else ''}"
                 elif delta.seconds > 3600:
@@ -391,6 +408,7 @@ def get_recent_activity():
                 'title': 'Entretien programmé',
                 'candidate': candidate_name,
                 'time': time_ago,
+                'sort_at': interview_at or datetime.min,
                 'icon': 'Calendar',
                 'color': 'text-purple-600 bg-purple-50'
             })
@@ -398,20 +416,19 @@ def get_recent_activity():
         # 3. Dernier contrat signé
         contracts_ref = db.collection('contracts')\
             .where('company_id', '==', company_id)\
-            .where('status', '==', 'accepted')\
-            .order_by('created_at', direction=firestore.Query.DESCENDING)\
-            .limit(1)
-        for doc in contracts_ref.stream():
+            .where('status', '==', 'accepted')
+        for doc in filter(None, [latest_doc(contracts_ref, 'created_at')]):
             contract = doc.to_dict()
             candidate_doc = db.collection('users').document(contract['candidate_id']).get()
             candidate_name = "Anonyme"
             if candidate_doc.exists:
                 u = candidate_doc.to_dict()
-                candidate_name = f"{u.get('firstName', '')} {u.get('lastName', '')}".strip() or u.get('name', 'Anonyme')
+                candidate_name = display_name(u)
 
             time_ago = "Récemment"
-            if contract.get('created_at'):
-                delta = now - contract['created_at'].to_datetime().replace(tzinfo=None)
+            created_at = _to_naive_datetime(contract.get('created_at'))
+            if created_at:
+                delta = now - created_at
                 if delta.days == 0:
                     time_ago = "Aujourd'hui"
                 elif delta.days == 1:
@@ -424,12 +441,15 @@ def get_recent_activity():
                 'title': 'Contrat signé',
                 'candidate': candidate_name,
                 'time': time_ago,
+                'sort_at': created_at or datetime.min,
                 'icon': 'CheckCircle',
                 'color': 'text-green-600 bg-green-50'
             })
 
-        # Trier par date décroissante et garder les 3 plus récents
-        activity = sorted(activity, key=lambda x: x.get('time', ''), reverse=True)[:3]
+        # Trier par date réelle décroissante et garder les 3 plus récents
+        activity = sorted(activity, key=lambda x: x['sort_at'], reverse=True)[:3]
+        for item in activity:
+            item.pop('sort_at')
 
         return jsonify({'success': True, 'activity': activity})
 

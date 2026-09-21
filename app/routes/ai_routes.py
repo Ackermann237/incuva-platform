@@ -8,15 +8,23 @@ import io
 from docx import Document
 import logging
 import json
+from urllib.parse import urlparse
+
+from ..storage_urls import canonical, is_storage_url, sign
 
 ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')
+
+
+def is_allowed_cv_url(url):
+    """N'autorise que les fichiers de notre stockage (évite que le serveur télécharge une URL arbitraire)."""
+    return is_storage_url(url)
 
 
 def extract_text_from_pdf(url):
     """Extrait le texte d'un PDF depuis une URL S3."""
     try:
-        # Télécharger le PDF depuis S3
-        response = requests.get(url)
+        # Télécharger le PDF depuis S3 (le stockage est privé : lecture par adresse signée)
+        response = requests.get(sign(canonical(url)), timeout=30)
         response.raise_for_status()
 
         # Lire le PDF
@@ -37,7 +45,7 @@ def extract_text_from_pdf(url):
 def extract_text_from_docx(url):
     """Extrait le texte d'un DOCX depuis une URL S3."""
     try:
-        response = requests.get(url)
+        response = requests.get(sign(canonical(url)), timeout=30)
         response.raise_for_status()
 
         docx_file = io.BytesIO(response.content)
@@ -265,12 +273,17 @@ def clean_ai_analysis(analysis):
 @ai_bp.route('/analyze-cv', methods=['POST'])
 def analyze_cv():
     """Analyse un CV avec l'IA et extrait les informations."""
+    if 'uid' not in session:
+        return jsonify({'success': False, 'error': 'Non authentifié'}), 401
+
     try:
-        data = request.get_json()
-        cv_url = data.get('cv_url')
+        data = request.get_json(silent=True) or {}
+        cv_url = canonical(data.get('cv_url') or '')  # sans signature : l'extension est lue sur l'adresse
 
         if not cv_url:
             return jsonify({'success': False, 'error': 'URL du CV manquante'}), 400
+        if not is_allowed_cv_url(cv_url):
+            return jsonify({'success': False, 'error': 'URL du CV non autorisée'}), 400
 
         # Détecter le type de fichier
         if cv_url.endswith('.pdf'):
@@ -331,11 +344,13 @@ def auto_complete_profile():
         return jsonify({'success': False, 'error': 'Non authentifié'}), 401
 
     user_id = session['uid']
-    data = request.get_json()
-    cv_url = data.get('cv_url')
+    data = request.get_json(silent=True) or {}
+    cv_url = canonical(data.get('cv_url') or '')
 
     if not cv_url:
         return jsonify({'success': False, 'error': 'URL du CV manquante'}), 400
+    if not is_allowed_cv_url(cv_url):
+        return jsonify({'success': False, 'error': 'URL du CV non autorisée'}), 400
 
     try:
         # Extraire le texte du CV

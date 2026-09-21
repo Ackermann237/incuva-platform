@@ -5,6 +5,8 @@ import datetime
 import logging
 from functools import wraps
 from ..firebase.init_firebase import db
+from ..query_utils import sort_docs_desc
+from ..user_utils import display_name
 
 logger = logging.getLogger(__name__)
 employees_bp = Blueprint('employees', __name__, url_prefix='/api/employees')
@@ -31,11 +33,10 @@ def get_employees():
 
         # Récupérer tous les employés de l'entreprise
         employees_ref = db.collection('employees') \
-            .where('company_id', '==', company_id) \
-            .order_by('hire_date', direction=firestore.Query.DESCENDING)
+            .where('company_id', '==', company_id)
 
         employees = []
-        for doc in employees_ref.stream():
+        for doc in sort_docs_desc(employees_ref.stream(), 'hire_date'):
             data = doc.to_dict()
             data['id'] = doc.id
 
@@ -49,9 +50,17 @@ def get_employees():
                                                                                'isoformat') else str(data['start_date'])
 
             # Récupérer les informations complémentaires du candidat
-            candidate_doc = db.collection('users').document(data['candidate_id']).get()
-            if candidate_doc.exists:
+            candidate_id = data.get('candidate_id')
+            candidate_doc = db.collection('users').document(candidate_id).get() if candidate_id else None
+            if candidate_doc and candidate_doc.exists:
                 candidate_data = candidate_doc.to_dict()
+
+                # Rattrapage : les employés créés avant la correction portent un nom incomplet (nom de famille seul)
+                full_name = display_name(candidate_data, data.get('candidate_name', ''))
+                if full_name and full_name != data.get('candidate_name'):
+                    db.collection('employees').document(doc.id).update({'candidate_name': full_name})
+                    data['candidate_name'] = full_name
+
                 data['email'] = candidate_data.get('email', data.get('email', ''))
                 data['phone'] = candidate_data.get('phone', data.get('phone', ''))
                 data['location'] = candidate_data.get('location', data.get('location', ''))
@@ -218,8 +227,7 @@ def get_employee_stats():
 
         # Récupérer tous les employés
         employees_ref = db.collection('employees') \
-            .where('company_id', '==', company_id) \
-            .stream()
+            .where('company_id', '==', company_id)
 
         employees = []
         for doc in employees_ref.stream():

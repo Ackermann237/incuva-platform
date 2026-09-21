@@ -6,6 +6,8 @@ from ..services.contract_service import ContractService
 from ..services.messaging_service import MessagingService
 from ..hr.contracts_generator import ContractGenerator
 from ..firebase.init_firebase import db
+from ..user_utils import display_name
+from .notifications import create_notification
 import logging
 import datetime
 
@@ -20,7 +22,12 @@ def setup_automatic_payroll(employee_id, contract_data):
         company_id = contract_data['company_id']
         salary = contract_data['salary']
         contract_type = contract_data['contract_type']
-        start_date = contract_data.get('start_date', datetime.datetime.now())
+        start_date = contract_data.get('start_date')
+        # Firestore renvoie des dates avec fuseau horaire ; on les compare à des dates naïves
+        if isinstance(start_date, datetime.datetime):
+            start_date = start_date.replace(tzinfo=None)
+        else:
+            start_date = datetime.datetime.now()
 
         # Calculer la période de paie (du 1er au dernier jour du mois)
         today = datetime.datetime.now()
@@ -40,7 +47,7 @@ def setup_automatic_payroll(employee_id, contract_data):
             'employee_id': employee_id,
             'company_id': company_id,
             'contract_type': contract_type,
-            'gross_salary': float(salary),
+            'gross_salary': round(float(salary) / 12, 2),  # salaire mensuel (le contrat donne l'annuel)
             'period_start': period_start,
             'period_end': period_end,
             'payment_date': payment_date,
@@ -66,6 +73,27 @@ def setup_automatic_payroll(employee_id, contract_data):
         return None
 
 
+def finalize_accepted_contract(contract_data):
+    """Après acceptation d'un contrat : garantit l'employé et sa configuration de paie automatique.
+
+    Idempotent : ContractService crée déjà l'employé à l'acceptation, mais rien ne configurait la paie
+    (le bulletin initial n'était jamais généré). Retourne l'id de l'employé.
+    """
+    company_id = contract_data['company_id']
+    candidate_id = contract_data['candidate_id']
+
+    existing = list(db.collection('employees').where('company_id', '==', company_id)
+                    .where('candidate_id', '==', candidate_id).limit(1).stream())
+    employee_id = existing[0].id if existing else add_employee_to_company(contract_data)
+
+    if employee_id:
+        has_config = any(db.collection('payroll_configurations').where('employee_id', '==', employee_id)
+                         .limit(1).stream())
+        if not has_config:
+            setup_automatic_payroll(employee_id, contract_data)
+    return employee_id
+
+
 def get_last_working_day(end_date):
     """Trouve le dernier jour ouvré du mois"""
     # Par défaut, le dernier jour du mois
@@ -82,10 +110,13 @@ def get_last_working_day(end_date):
 
 
 def generate_first_payslip(employee_id, company_id, salary, period_start, period_end, payment_date):
-    """Génère le premier bulletin de paie pour un nouvel employé"""
+    """Génère le premier bulletin de paie pour un nouvel employé.
+
+    `salary` est le salaire brut ANNUEL du contrat ; le bulletin est mensuel (salaire annuel / 12).
+    """
     try:
         # Calculer les cotisations (même logique que dans payroll.py)
-        gross_salary = float(salary)
+        gross_salary = round(float(salary) / 12, 2)
 
         # Cotisations salariales (environ 23%)
         employee_contributions = {
@@ -125,8 +156,9 @@ def generate_first_payslip(employee_id, company_id, salary, period_start, period
         payslip_data = {
             'company_id': company_id,
             'employee_id': employee_id,
-            'period_start': period_start,
-            'period_end': period_end,
+            # Même format (AAAA-MM-JJ) que les bulletins créés manuellement, pour les tris et filtres
+            'period_start': period_start.strftime('%Y-%m-%d'),
+            'period_end': period_end.strftime('%Y-%m-%d'),
             'gross_salary': gross_salary,
             'net_salary': net_salary,
             'employee_contributions': employee_contributions,
@@ -143,7 +175,7 @@ def generate_first_payslip(employee_id, company_id, salary, period_start, period
             'deductions': 0,
             'status': 'draft',
             'payment_method': 'bank_transfer',
-            'payment_date': payment_date,
+            'payment_date': payment_date.strftime('%Y-%m-%d'),
             'notes': f'Premier bulletin - Contrat signé le {datetime.datetime.now().strftime("%d/%m/%Y")}',
             'generated_at': datetime.datetime.now(),
             'payslip_number': f"PAY-{datetime.datetime.now().strftime('%Y%m')}-{str(uuid.uuid4())[:8]}",
@@ -184,7 +216,7 @@ def create_contract_api(chat_id, candidate_id):
             return jsonify({'success': False, 'message': 'Candidat non trouvé.'}), 404
 
         candidate_data = candidate_doc.to_dict()
-        candidate_name = candidate_data.get('name', 'Anonyme')
+        candidate_name = display_name(candidate_data)
 
         # Récupérer les données du frontend
         data = request.get_json()
@@ -251,6 +283,11 @@ def create_contract_api(chat_id, candidate_id):
                 'contract_link': contract_link
             }
         )
+        create_notification(
+            db, candidate_id, 'contract_received', 'Nouveau contrat à consulter',
+            f"{company_name} vous a envoyé un contrat pour le poste « {position} ».",
+            data={'contract_id': contract_id, 'company_id': session['uid']},
+        )
 
         return jsonify({
             'success': True,
@@ -289,7 +326,7 @@ def generate_contract():
             return jsonify({'success': False, 'error': 'Candidat non trouvé'}), 404
 
         candidate_data = candidate_doc.to_dict()
-        candidate_name = candidate_data.get('name', 'Anonyme')
+        candidate_name = display_name(candidate_data)
         candidate_country = candidate_data.get('country', 'Non spécifié')
 
         # Récupérer informations entreprise
@@ -352,9 +389,15 @@ def view_contract(contract_id):
             contract_service = ContractService(db)
             new_status = 'accepted' if action == 'accept' else 'rejected'
             contract_service.update_contract_status(contract_id, new_status)
+            if new_status == 'accepted':
+                finalize_accepted_contract(contract_data)
 
             messaging_service = MessagingService(db)
-            message_content = f"Le candidat {contract_data['candidate_name']} a {new_status} le contrat pour le poste de {contract_data['position']}."
+            candidate_doc = db.collection('users').document(user_id).get()
+            candidate_name = display_name(candidate_doc.to_dict(), contract_data['candidate_name']) \
+                if candidate_doc.exists else contract_data['candidate_name']
+            status_label = 'accepté' if new_status == 'accepted' else 'refusé'
+            message_content = f"Le candidat {candidate_name} a {status_label} le contrat pour le poste de {contract_data['position']}."
             messaging_service.send_message(
                 chat_id=contract_data['chat_id'],
                 sender_id=user_id,
@@ -426,12 +469,8 @@ def sign_contract(contract_id):
         contract_service = ContractService(db)
         contract_service.update_contract_status(contract_id, 'accepted')
 
-        # AJOUTER CETTE LIGNE : Ajouter l'employé automatiquement
-        employee_id = add_employee_to_company(contract_data)
-
-        # AJOUTER CETTE LIGNE : Configurer la paie automatiquement
-        if employee_id:
-            setup_automatic_payroll(employee_id, contract_data)
+        # Ajouter l'employé et configurer la paie automatiquement
+        finalize_accepted_contract(contract_data)
 
         # Envoyer un message de confirmation dans le chat
         messaging_service = MessagingService(db)
@@ -481,12 +520,17 @@ def add_employee_to_company(contract_data):
     try:
         company_id = contract_data['company_id']
         candidate_id = contract_data['candidate_id']
-        candidate_name = contract_data['candidate_name']
         position = contract_data['position']
         salary = contract_data['salary']
         contract_type = contract_data['contract_type']
         start_date = contract_data.get('start_date', datetime.datetime.now())
         contract_id = contract_data.get('id', '')
+
+        # Récupérer les informations du candidat
+        candidate_doc = db.collection('users').document(candidate_id).get()
+        candidate_data = candidate_doc.to_dict() if candidate_doc.exists else {}
+        # Nom complet d'après le profil actuel (le nom stocké dans le contrat peut être incomplet)
+        candidate_name = display_name(candidate_data, contract_data['candidate_name'])
 
         # Vérifier si l'employé existe déjà
         employee_ref = db.collection('employees').where('company_id', '==', company_id) \
@@ -495,10 +539,6 @@ def add_employee_to_company(contract_data):
         if any(employee_ref):
             logger.info(f"L'employé {candidate_name} existe déjà pour l'entreprise {company_id}")
             return None
-
-        # Récupérer les informations du candidat
-        candidate_doc = db.collection('users').document(candidate_id).get()
-        candidate_data = candidate_doc.to_dict() if candidate_doc.exists else {}
 
         # Créer l'entrée employé
         employee_data = {

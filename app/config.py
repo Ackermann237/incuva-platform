@@ -32,6 +32,8 @@ class Config:
 
     # HUGGING FACE
     HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+    # Modèle de l'assistant Jarvis (facultatif ; par défaut Llama 3.1 8B Instruct)
+    JARVIS_MODEL = os.getenv("JARVIS_MODEL")
 
     # AssemblyAI
     ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
