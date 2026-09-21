@@ -404,25 +404,14 @@ export async function getAllPayslipsForAI() {
 }
 
 // Mettez à jour la fonction analyzePayrollWithAI :
-export async function analyzePayrollWithAI(payrollData) {
+export async function analyzePayrollWithAI() {
   try {
-    // Récupérer tous les bulletins pour l'analyse IA
-    const allPayslipsRes = await getAllPayslipsForAI();
-
-    if (!allPayslipsRes.success) {
-      return { success: false, error: 'Impossible de récupérer les bulletins pour analyse' };
-    }
-
+    // Le serveur relit lui-même tous les bulletins : indicateurs, anomalies, projection et commentaire de l'IA
     const response = await fetch('/api/payroll/ai/analyze_payroll', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({
-        payroll_data: {
-          ...payrollData,
-          all_payslips: allPayslipsRes.payslips // Ajouter tous les bulletins
-        }
-      })
+      body: JSON.stringify({})
     });
 
     const data = await response.json();

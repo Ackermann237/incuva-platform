@@ -1,11 +1,14 @@
 // src/pages/Dashboard/UserDashboard.jsx
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { getUserDashboard } from "../../services/dashboard";
 import {
-  MapPin, Briefcase, User, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle
+  MapPin, Briefcase, User, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle, Pencil
 } from "lucide-react";
 
 export default function UserDashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,10 +35,7 @@ export default function UserDashboard() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-gray-600 font-medium">Chargement de votre tableau de bord...</p>
-      </div>
+      <LottieLoader label="Chargement de votre tableau de bord..." size={120} />
     );
   }
 
@@ -50,13 +50,27 @@ export default function UserDashboard() {
 
   const user = data.user;
 
+  // Complétion du profil, calculée sur les données réelles du candidat
+  const completionChecks = [
+    ["une présentation", !!user?.bio],
+    ["des compétences", user?.skills?.length > 0],
+    ["vos langues", user?.languages?.length > 0],
+    ["votre profil LinkedIn", !!user?.linkedin],
+    ["votre CV", !!user?.cvUrl],
+    ["une expérience", user?.experience?.length > 0],
+    ["une formation", user?.education?.length > 0],
+    ["votre téléphone", !!user?.phone],
+  ];
+  const completion = Math.round((completionChecks.filter(([, done]) => done).length / completionChecks.length) * 100);
+  const missing = completionChecks.filter(([, done]) => !done).map(([label]) => label);
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Profil utilisateur */}
         <div className="md:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-md">
                 <User className="w-8 h-8" />
@@ -67,6 +81,25 @@ export default function UserDashboard() {
                 </h2>
                 <p className="text-gray-500">{user.email}</p>
               </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/user_dashboard", { state: { activeTab: "profile", edit: true } })}
+              className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-700"
+            >
+              <Pencil className="w-4 h-4" />
+              Modifier mon profil
+            </button>
+          </div>
+          <div className="mb-4">
+            <div className="mb-1.5 flex items-center justify-between text-sm">
+              <span className="text-gray-600">
+                {missing.length ? `Complétez votre profil : ajoutez ${missing.slice(0, 2).join(" et ")}.` : "Votre profil est complet, bravo !"}
+              </span>
+              <span className="font-semibold text-purple-700">{completion} %</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+              <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700" style={{ width: `${completion}%` }} />
             </div>
           </div>
           <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-100">

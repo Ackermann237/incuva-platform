@@ -2,7 +2,7 @@
 import React from 'react';
 import {
   Calendar, ChevronLeft, ChevronRight, Plus,
-  RefreshCw, Loader2, Sparkles, Grid, Table
+  RefreshCw, Sparkles, Grid, Table
 } from 'lucide-react';
 
 export default function Header({
@@ -14,7 +14,9 @@ export default function Header({
   getEndDate,
   onAddShift,
   onRefresh,
-  aiGenerating
+  onOptimize,
+  refreshing,
+  lastUpdated
 }) {
   const handleDateChange = (direction) => {
     const newDate = new Date(currentDate);
@@ -153,25 +155,19 @@ export default function Header({
           <div className="flex items-center gap-3">
             <button
               onClick={onRefresh}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2 transition-all"
-              title="Actualiser"
+              disabled={refreshing}
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2 transition-all disabled:opacity-70"
+              title={lastUpdated ? `Dernière actualisation à ${lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Actualiser'}
             >
-              <RefreshCw className="w-4 h-4" />
-              Actualiser
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Actualisation...' : 'Actualiser'}
             </button>
 
             <button
-              onClick={() => {
-                // Fonction d'optimisation IA
-              }}
-              disabled={aiGenerating}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:opacity-90 flex items-center gap-2 disabled:opacity-50 transition-all"
+              onClick={onOptimize}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:opacity-90 flex items-center gap-2 transition-all"
             >
-              {aiGenerating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
+              <Sparkles className="w-4 h-4" />
               Optimiser IA
             </button>
 

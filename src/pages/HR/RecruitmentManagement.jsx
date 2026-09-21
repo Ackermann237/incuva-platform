@@ -1,5 +1,6 @@
 // src/pages/HR/RecruitmentManagement.jsx
 import React, { useState } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import {
   Users, Briefcase, Clock, CheckCircle,
   XCircle, Search, Filter, ChevronRight,
@@ -16,13 +17,7 @@ export default function RecruitmentManagement({ data, loading }) {
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center py-20">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-blue-100 rounded-full"></div>
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin absolute top-0"></div>
-        </div>
-        <p className="mt-4 text-gray-600 font-medium">Chargement des données...</p>
-      </div>
+      <LottieLoader label="Chargement des données..." className="min-h-[60vh]" />
     );
   }
 

@@ -43,11 +43,14 @@ import TestSelectionPage from "./pages/Jobs/Entreprises/TechnicalTest/Candidate/
 import Planning from './pages/Employees/Planning/Planning';
 import Absence from './pages/Employees/Absence/Absence';
 import Payroll from './pages/Employees/Payroll/Payroll';
+import BackToDashboard from './components/BackToDashboard';
+import Settings from './pages/Settings/Settings';
 
 
 function App() {
   return (
     <Router>
+      <BackToDashboard />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
@@ -96,6 +99,7 @@ function App() {
         <Route path="/absences" element={<Absence />} />
         <Route path="/payroll" element={<Payroll />} />
         <Route path="/visio-training/:applicationId?" element={<VisioTraining />} />
+        <Route path="/settings" element={<Settings />} />
 
         {/* Ajoute d'autres routes au besoin */}
       </Routes>

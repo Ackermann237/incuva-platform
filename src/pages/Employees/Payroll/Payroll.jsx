@@ -1,5 +1,6 @@
 // src/pages/Employees/Payroll/Payroll.jsx
 import React, { useState, useEffect } from 'react';
+import LottieLoader from '../../../components/lottie/LottieLoader';
 import { useNavigate } from 'react-router-dom';
 import {
   DollarSign, Users, FileText, CheckCircle, Clock,
@@ -147,10 +148,7 @@ export default function Payroll() {
   if (loading && !payslips.length) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Chargement de la paie...</p>
-        </div>
+        <LottieLoader label="Chargement de la paie..." />
       </div>
     );
   }

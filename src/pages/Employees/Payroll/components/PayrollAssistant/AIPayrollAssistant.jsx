@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Header from './Header';
 import AnalysisPanel from './AnalysisPanel';
+import AnalysisProgress from './AnalysisProgress';
+import PayrollReport from './PayrollReport';
 import ChatPanel from './ChatPanel';
 import Footer from './Footer';
 import { analyzePayrollWithAI, queryPayrollAI, getAllPayslipsForAI } from '../../../../../services/payroll';
@@ -11,6 +13,7 @@ export default function AIPayrollAssistant({ isOpen, onClose, payrollData }) {
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('summary');
+  const [view, setView] = useState('report'); // 'report' : rapport complet, 'chat' : discussion avec l'assistant
   const [chatMessages, setChatMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
@@ -35,18 +38,7 @@ export default function AIPayrollAssistant({ isOpen, onClose, payrollData }) {
           {
             id: 1,
             type: 'assistant',
-            content: `👋 Bonjour ! Je suis votre assistant IA pour la gestion de paie.
-
-J'ai accès à ${result.payslips.length} bulletins de paie dans votre système.
-
-🔄 Je peux vous aider à :
-• Analyser les tendances de vos coûts de paie
-• Détecter les anomalies et problèmes potentiels
-• Faire des projections budgétaires
-• Optimiser vos cotisations sociales
-• Répondre à vos questions spécifiques
-
-💡 Astuce : Cliquez sur une suggestion ci-dessous ou tapez votre question dans la zone de texte.`,
+            content: `Bonjour ! Je suis votre assistant IA pour la gestion de paie.\n\nJ'ai accès à **${result.payslips.length} bulletin(s)** de paie de votre entreprise. Posez-moi n'importe quelle question : je réponds à partir de vos chiffres réels, et aussi sur les règles générales de la paie.\n\nAstuce : lancez d'abord **l'analyse IA** pour obtenir un rapport complet, puis discutez des résultats ici.`,
             timestamp: new Date()
           }
         ]);
@@ -61,30 +53,18 @@ J'ai accès à ${result.payslips.length} bulletins de paie dans votre système.
     setError('');
 
     try {
-      const result = await analyzePayrollWithAI({
-        ...payrollData,
-        all_payslips: allPayslips
-      });
+      // Le serveur relit tous les bulletins, calcule les indicateurs et fait rédiger l'analyse par l'IA
+      const result = await analyzePayrollWithAI();
 
       if (result.success) {
+        const { metrics, narrative } = result.analysis;
         setAnalysis(result.analysis);
+        setView('report');
 
         setChatMessages(prev => [...prev, {
           id: Date.now(),
           type: 'assistant',
-          content: `✅ Analyse IA terminée avec succès !
-
-J'ai analysé en profondeur vos ${allPayslips.length} bulletins de paie. Voici ce que j'ai découvert :
-
-📊 Points clés :
-• ${result.analysis?.trends?.[0]?.substring(0, 100) || "Analyse des tendances complétée"}
-• ${result.analysis?.recommendations?.[0]?.substring(0, 100) || "Recommandations générées"}
-• ${result.analysis?.alerts?.[0]?.substring(0, 100) || "Aucune alerte critique détectée"}
-
-🔍 Pour explorer les détails :
-1. Consultez les onglets dans le panneau de gauche
-2. Posez-moi des questions spécifiques
-3. Utilisez les suggestions rapides ci-dessous`,
+          content: `Analyse terminée. Score de santé de la paie : **${metrics.score_sante.score ?? '—'}/100** (${metrics.score_sante.niveau}).\n\n${narrative.synthese}\n\nPosez-moi vos questions sur ces résultats.`,
           timestamp: new Date()
         }]);
       } else {
@@ -98,151 +78,42 @@ J'ai analysé en profondeur vos ${allPayslips.length} bulletins de paie. Voici c
     }
   };
 
-  const sendMessage = async () => {
-    if (!userInput.trim() || chatLoading) return;
+  // `override` : texte envoyé directement (suggestion cliquée) ; sinon le contenu du champ de saisie
+  const sendMessage = async (override) => {
+    const text = (typeof override === 'string' ? override : userInput).trim();
+    if (!text || chatLoading) return;
 
-    const userMessage = {
-      id: Date.now(),
-      type: 'user',
-      content: userInput.trim(),
-      timestamp: new Date()
-    };
-
-    setChatMessages(prev => [...prev, userMessage]);
+    setChatMessages(prev => [...prev, { id: Date.now(), type: 'user', content: text, timestamp: new Date() }]);
     setUserInput('');
     setChatLoading(true);
 
     try {
-      const contextData = {
-        payslips_count: allPayslips.length,
-        employees_count: payrollData?.employees?.length || 0,
-        stats: payrollData?.stats || {},
-        all_payslips_summary: allPayslips.slice(0, 10).map(p => ({
-          employee_name: p.employee_name || 'Inconnu',
-          gross_salary: p.gross_salary,
-          net_salary: p.net_salary,
-          status: p.status,
-          period: `${p.period_start} - ${p.period_end}`
-        })),
-        has_analysis: !!analysis
-      };
+      const response = await queryPayrollAI(text);
 
-      const response = await queryPayrollAI(userInput, contextData);
-
-      if (response.success) {
-        const assistantMessage = {
-          id: Date.now() + 1,
-          type: 'assistant',
-          content: response.answer,
-          timestamp: new Date()
-        };
-
-        setChatMessages(prev => [...prev, assistantMessage]);
-      } else {
-        throw new Error(response.error);
-      }
+      if (!response.success) throw new Error(response.error);
+      setChatMessages(prev => [...prev, { id: Date.now() + 1, type: 'assistant', content: response.answer, timestamp: new Date() }]);
     } catch (err) {
-      const errorMessage = {
+      setChatMessages(prev => [...prev, {
         id: Date.now() + 1,
         type: 'assistant',
-        content: `❌ Désolé, une erreur s'est produite : ${err.message}
-
-Essayez de : 
-1. Rafraîchir la page
-2. Vérifier votre connexion internet
-3. Contacter le support technique si le problème persiste`,
+        content: `Désolé, je n'ai pas pu répondre : ${err.message || 'erreur inconnue'}. Réessayez dans un instant.`,
         timestamp: new Date(),
         isError: true
-      };
-
-      setChatMessages(prev => [...prev, errorMessage]);
+      }]);
     } finally {
       setChatLoading(false);
     }
   };
 
+  // Une suggestion pose réellement la question à l'IA (plus de réponses préécrites)
   const handleSuggestionClick = (suggestion) => {
-    setUserInput(suggestion.text);
+    setView('chat');
+    sendMessage(suggestion.text);
+  };
 
-    if (chatMessages.length <= 1) {
-      const userMessage = {
-        id: Date.now(),
-        type: 'user',
-        content: suggestion.text,
-        timestamp: new Date()
-      };
-      setChatMessages(prev => [...prev, userMessage]);
-      setTimeout(() => {
-        setChatLoading(true);
-        setTimeout(() => {
-          const responses = {
-            "Quels sont les bulletins en attente ?": `🔍 Analyse des bulletins en attente...
-
-Je recherche parmi vos ${allPayslips.length} bulletins ceux qui sont en statut "draft" ou "en attente". Cela peut prendre quelques secondes.
-
-📋 Pour une analyse complète :
-1. Lancez l'analyse IA complète pour des statistiques détaillées
-2. Consultez le tableau des bulletins dans la page principale
-3. Filtrez par statut pour voir les bulletins spécifiques
-
-💡 Action rapide : Cliquez sur "Démarrer l'analyse IA" pour une vue d'ensemble.`,
-            "Analyse les coûts de paie par département": `📊 Analyse des coûts par département...
-
-Je prépare une analyse détaillée de la répartition des coûts de paie entre vos différents départements.
-
-🏢 Ce que je vais examiner :
-• Répartition des salaires par service/département
-• Coût moyen par employé par département
-• Écarts et anomalies potentielles
-
-⚡ Pour des résultats précis : Lancez l'analyse IA complète.`,
-            "Y a-t-il des anomalies dans les salaires ?": `🛡️ Détection d'anomalies salariales...
-
-Je scanne vos ${allPayslips.length} bulletins pour détecter :
-• Salaires anormalement élevés ou bas
-• Incohérences dans les cotisations
-• Écarts importants entre employés similaires
-
-⚠️ Important : L'analyse complète IA fournira une détection plus précise des anomalies.`,
-            "Projette les coûts pour le prochain trimestre": `📈 Projection des coûts trimestriels...
-
-Basé sur vos données historiques, je calcule :
-• Tendances de croissance des salaires
-• Impact des nouvelles embauches
-• Variations saisonnières potentielles
-
-🎯 Précision : Les projections sont plus fiables après une analyse IA complète.`,
-            "Comment optimiser les cotisations ?": `💡 Optimisation des cotisations sociales...
-
-J'analyse les opportunités d'optimisation :
-• Réduction légale des charges sociales
-• Optimisation fiscale
-• Aides et crédits d'impôt disponibles
-
-⚖️ Note : Toutes les optimisations respectent la réglementation en vigueur.`
-          };
-
-          const response = responses[suggestion.text] || `🤖 Traitement de votre demande...
-
-Je prépare une réponse spécifique à : "${suggestion.text}"
-
-🔄 Pour une analyse approfondie : 
-• Lancez l'analyse IA complète
-• Fournissez plus de contexte si nécessaire
-• Consultez les onglets d'analyse une fois terminé`;
-
-          const assistantMessage = {
-            id: Date.now() + 1,
-            type: 'assistant',
-            content: response,
-            timestamp: new Date()
-          };
-
-          setChatMessages(prev => [...prev, assistantMessage]);
-          setChatLoading(false);
-        }, 1500);
-      }, 300);
-    }
+  const askFromReport = (question) => {
+    setView('chat');
+    sendMessage(question);
   };
 
   useEffect(() => {
@@ -253,40 +124,52 @@ Je prépare une réponse spécifique à : "${suggestion.text}"
 
   if (!isOpen) return null;
 
+  const showReport = analysis && view === 'report' && !loading;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
-      <div className="bg-white rounded-xl max-w-6xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+      <div className="bg-white rounded-xl max-w-6xl w-full h-[88vh] overflow-hidden flex flex-col shadow-2xl">
         <Header
           analysis={analysis}
           allPayslips={allPayslips}
           onClose={onClose}
+          view={view}
+          setView={setView}
         />
 
-        <div className="flex flex-1 overflow-hidden">
-          <AnalysisPanel
-            loading={loading}
-            error={error}
-            analysis={analysis}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            allPayslips={allPayslips}
-            analyzeData={analyzeData}
-            handleSuggestionClick={handleSuggestionClick}
-          />
+        {loading ? (
+          <AnalysisProgress />
+        ) : showReport ? (
+          <div className="flex-1 overflow-y-auto bg-gray-50 p-5 md:p-6">
+            <PayrollReport analysis={analysis} onAsk={askFromReport} onNewAnalysis={analyzeData} />
+          </div>
+        ) : (
+          <div className="flex flex-1 overflow-hidden">
+            <AnalysisPanel
+              loading={loading}
+              error={error}
+              analysis={analysis}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              allPayslips={allPayslips}
+              analyzeData={analyzeData}
+              handleSuggestionClick={handleSuggestionClick}
+            />
 
-          <ChatPanel
-            chatMessages={chatMessages}
-            chatLoading={chatLoading}
-            allPayslips={allPayslips}
-            hasDataForChat={hasDataForChat}
-            chatEndRef={chatEndRef}
-            handleSuggestionClick={handleSuggestionClick}
-            userInput={userInput}
-            setUserInput={setUserInput}
-            sendMessage={sendMessage}
-            chatMessagesCount={chatMessages.length}
-          />
-        </div>
+            <ChatPanel
+              chatMessages={chatMessages}
+              chatLoading={chatLoading}
+              allPayslips={allPayslips}
+              hasDataForChat={hasDataForChat}
+              chatEndRef={chatEndRef}
+              handleSuggestionClick={handleSuggestionClick}
+              userInput={userInput}
+              setUserInput={setUserInput}
+              sendMessage={sendMessage}
+              chatMessagesCount={chatMessages.length}
+            />
+          </div>
+        )}
 
         <Footer
           analysis={analysis}

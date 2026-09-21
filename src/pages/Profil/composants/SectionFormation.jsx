@@ -2,7 +2,7 @@
 import React from 'react';
 import { GraduationCap, Plus, Trash2 } from 'lucide-react';
 
-const SectionFormation = ({ profile, formData, isEditing, handleArrayChange, addItem, removeItem }) => {
+const SectionFormation = ({ profile, formData, isEditing, handleArrayChange, addItem, removeItem, onStartEdit }) => {
   return (
     <div className="bg-white rounded-3xl shadow-xl p-8">
       <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
@@ -36,7 +36,11 @@ const SectionFormation = ({ profile, formData, isEditing, handleArrayChange, add
               <h4 className="font-bold">{edu.degree}</h4>
               <p className="text-gray-600">{edu.school} • {edu.start} – {edu.end || 'En cours'}</p>
             </div>
-          )) : <p className="text-gray-500">Aucune formation ajoutée</p>}
+          )) : (
+            <button type="button" onClick={onStartEdit} className="flex items-center gap-2 rounded-xl border border-dashed border-purple-300 px-5 py-3 text-purple-600 hover:bg-purple-50">
+              <Plus className="w-5 h-5" /> Ajouter une formation
+            </button>
+          )}
         </div>
       )}
     </div>

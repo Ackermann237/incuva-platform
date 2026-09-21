@@ -1,5 +1,6 @@
 // src/pages/HR/DataAnalysis.jsx
 import React, { useState, useEffect } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import AIPromptModal from "../../components/AIPromptModal";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie,
@@ -49,14 +50,8 @@ export default function DataAnalysis({ data, loading, timeRange }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex flex-col items-center justify-center py-20">
-        <div className="relative">
-          <div className="w-20 h-20 border-4 border-blue-200 rounded-full"></div>
-          <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin absolute top-0"></div>
-        </div>
-        <div className="mt-6 space-y-2 text-center">
-          <p className="text-lg font-semibold text-gray-700">Chargement des analyses</p>
-          <p className="text-sm text-gray-500">Préparation des visualisations...</p>
-        </div>
+        <LottieLoader label="Chargement des analyses" size={120} className="py-0" />
+        <p className="text-sm text-gray-500">Préparation des visualisations...</p>
       </div>
     );
   }

@@ -1,5 +1,6 @@
 // src/pages/Jobs/JobList.jsx
 import React, { useEffect, useState } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { escapeHtml } from "../../utils/safeHtml";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getJobList, getDashboardStats } from "../../services/jobs";
@@ -75,10 +76,7 @@ export default function JobList() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-6">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Chargement du tableau de bord...</p>
-        </div>
+        <LottieLoader label="Chargement des offres..." />
       </div>
     );
   }

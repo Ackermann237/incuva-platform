@@ -1,5 +1,6 @@
 // src/pages/Candidate/TechnicalTestPage.jsx
 import React, { useState, useEffect } from 'react';
+import LottieLoader from '../../../../../components/lottie/LottieLoader';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Clock,
@@ -230,10 +231,7 @@ export default function TechnicalTestPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto" />
-          <p className="text-gray-600 font-medium">Chargement du test...</p>
-        </div>
+        <LottieLoader label="Chargement du test..." />
       </div>
     );
   }

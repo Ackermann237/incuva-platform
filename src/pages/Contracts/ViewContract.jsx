@@ -1,5 +1,6 @@
 // src/pages/Contracts/ViewContract.jsx
 import React, { useEffect, useState } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { escapeHtml, sanitizeHtml } from "../../utils/safeHtml";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -143,12 +144,7 @@ export default function ViewContract({ contractId: contractIdProp, onSign, onRej
   // === ÉCRAN DE CHARGEMENT ===
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement du contrat...</p>
-        </div>
-      </div>
+      <LottieLoader label="Chargement du contrat..." />
     );
   }
 

@@ -1,5 +1,6 @@
 // src/pages/HR/ProfilDetail.jsx
 import React, { useEffect, useState } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -81,10 +82,7 @@ export default function ProfilDetail() {
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
-          <p className="text-gray-600 font-medium">Chargement du profil...</p>
-        </div>
+        <LottieLoader label="Chargement du profil..." />
       </div>
     );
   }

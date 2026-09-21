@@ -1,8 +1,9 @@
 // frontend/src/pages/profil/composant/SectionCompetences.jsx
 import React from 'react';
-import { Award } from 'lucide-react';
+import { Award, Plus } from 'lucide-react';
+import TagInput from './TagInput';
 
-const SectionCompetences = ({ profile, formData, isEditing, handleChange }) => {
+const SectionCompetences = ({ profile, formData, isEditing, handleChange, onStartEdit }) => {
   return (
     <div className="bg-white rounded-3xl shadow-xl p-8">
       <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
@@ -10,17 +11,13 @@ const SectionCompetences = ({ profile, formData, isEditing, handleChange }) => {
         Compétences
       </h2>
       {isEditing ? (
-        <div>
-          <input
-            type="text"
-            name="skills"
-            value={formData.skills || ''}
-            onChange={handleChange}
-            className="w-full px-5 py-4 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500"
-            placeholder="React, Python, Figma, SEO, Management d'équipe..."
-          />
-          <p className="text-sm text-gray-500 mt-2">Séparez les compétences par des virgules</p>
-        </div>
+        <TagInput
+          name="skills"
+          value={formData.skills}
+          onChange={handleChange}
+          placeholder="React, Python, Figma, SEO, Management d'équipe..."
+          hint="Tapez une compétence puis appuyez sur Entrée ou virgule pour l'ajouter."
+        />
       ) : (
         <div className="flex flex-wrap gap-3">
           {profile?.skills?.length > 0 ? (
@@ -30,7 +27,9 @@ const SectionCompetences = ({ profile, formData, isEditing, handleChange }) => {
               </span>
             ))
           ) : (
-            <p className="text-gray-500">Aucune compétence indiquée</p>
+            <button type="button" onClick={onStartEdit} className="flex items-center gap-2 rounded-xl border border-dashed border-purple-300 px-5 py-3 text-purple-600 hover:bg-purple-50">
+              <Plus className="w-5 h-5" /> Ajouter mes compétences
+            </button>
           )}
         </div>
       )}

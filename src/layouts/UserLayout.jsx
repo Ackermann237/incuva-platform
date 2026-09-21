@@ -1,7 +1,10 @@
 // src/layouts/UserLayout.jsx
 import React, {useState, Suspense, lazy, useEffect} from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Layers, Briefcase, FileText, MessageSquare, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { Layers, Briefcase, FileText, MessageSquare, ChevronLeft, ChevronRight, Users, LogOut, Bell, Settings } from "lucide-react";
+import { logout } from "../services/auth";
+import NotificationsButton from "../components/NotificationsButton";
+import LottieLoader from "../components/lottie/LottieLoader";
 
 // Lazy loading des vraies pages
 const UserDashboard = lazy(() => import("../pages/Dashboard/UserDashboard"));
@@ -36,6 +39,16 @@ export default function UserLayout() {
     }
   }, [location.state]);
 
+  // Déconnexion : on ferme la session côté serveur puis on revient à la page d'accueil
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.error("Erreur lors de la déconnexion:", err);
+    }
+    navigate("/", { replace: true });
+  };
+
   const handleNavigation = (item) => {
     if (item.path) {
       navigate(item.path);
@@ -46,12 +59,7 @@ export default function UserLayout() {
 
   // Composant de chargement élégant
   const LoadingSpinner = () => (
-    <div className="flex items-center justify-center py-32">
-      <div className="text-center">
-        <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-600 font-medium">Chargement...</p>
-      </div>
-    </div>
+    <LottieLoader label="Chargement..." size={120} className="py-32" />
   );
 
   return (
@@ -100,6 +108,44 @@ export default function UserLayout() {
               );
             })}
           </nav>
+
+          <div className="p-4 border-t border-gray-200 space-y-2">
+            <NotificationsButton
+              renderTrigger={({ onClick, unread }) => (
+                <button
+                  onClick={onClick}
+                  title="Notifications"
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-all ${!isExpanded ? "justify-center" : ""}`}
+                >
+                  <span className="relative flex-shrink-0">
+                    <Bell className="w-5 h-5" />
+                    {unread > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 bg-red-500 text-white text-[10px] font-bold leading-4 text-center rounded-full">
+                        {unread > 9 ? "9+" : unread}
+                      </span>
+                    )}
+                  </span>
+                  {isExpanded && <span>Notifications</span>}
+                </button>
+              )}
+            />
+            <button
+              onClick={() => navigate("/settings")}
+              title="Paramètres"
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-all ${!isExpanded ? "justify-center" : ""}`}
+            >
+              <Settings className="w-5 h-5 flex-shrink-0" />
+              {isExpanded && <span>Paramètres</span>}
+            </button>
+            <button
+              onClick={handleLogout}
+              title="Déconnexion"
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all ${!isExpanded ? "justify-center" : ""}`}
+            >
+              <LogOut className="w-5 h-5 flex-shrink-0" />
+              {isExpanded && <span>Déconnexion</span>}
+            </button>
+          </div>
         </div>
       </aside>
 

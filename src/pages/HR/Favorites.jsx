@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { useNavigate } from "react-router-dom";
 import {
   Heart, Search, Filter, ChevronRight, ChevronLeft,
@@ -90,10 +91,7 @@ export default function Favorites() {
 
   // Afficher un état de chargement
   const renderLoading = () => (
-    <div className="flex flex-col items-center justify-center min-h-[300px]">
-      <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-      <p className="text-gray-600 font-medium">Chargement des favoris...</p>
-    </div>
+    <LottieLoader label="Chargement des favoris..." className="min-h-[300px]" />
   );
 
   // Afficher un état vide

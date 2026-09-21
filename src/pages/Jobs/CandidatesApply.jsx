@@ -1,5 +1,6 @@
 // src/pages/Jobs/CandidatesApply.jsx
 import React, { useState, useEffect } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { getJobList, getJobApplications } from "../../services/jobs";
 import { Users, Clock, CheckCircle, XCircle, Briefcase } from "lucide-react";
 import { format } from "date-fns";
@@ -38,7 +39,7 @@ export default function CandidatesApply() {
   };
 
   if (loading) {
-    return <div className="p-6 text-center">Chargement des candidatures...</div>;
+    return <LottieLoader label="Chargement des candidatures..." />;
   }
 
   return (

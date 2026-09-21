@@ -1,8 +1,8 @@
 // frontend/src/pages/profil/composant/HeaderProfil.jsx
 import React from "react";
-import { Camera, Edit2, X, MapPin, ShieldCheck } from "lucide-react";
+import { Edit2, X, MapPin, ShieldCheck } from "lucide-react";
 
-const HeaderProfil = ({ profile, isEditing, setIsEditing }) => {
+const HeaderProfil = ({ profile, isEditing, setIsEditing, formData, handleChange }) => {
   const initials = `${profile?.first_name?.[0] || ""}${profile?.name?.[0] || ""}`.toUpperCase();
   const roleLabel = profile?.userRole === "job_seeker" ? "Candidat" : "Freelance / Particulier";
 
@@ -63,13 +63,6 @@ const HeaderProfil = ({ profile, isEditing, setIsEditing }) => {
                 )}
               </div>
 
-              {/* Edit avatar */}
-              {isEditing && (
-                <button className="absolute -bottom-2 -right-2 rounded-xl bg-white border border-gray-200 px-2.5 py-2 shadow-sm hover:bg-gray-50 transition">
-                  <Camera className="w-4 h-4 text-blue-600" />
-                </button>
-              )}
-
               {/* Decorative ring */}
               <div className="pointer-events-none absolute -inset-2 rounded-[22px] ring-1 ring-blue-500/10" />
             </div>
@@ -77,9 +70,32 @@ const HeaderProfil = ({ profile, isEditing, setIsEditing }) => {
             {/* Name + badges */}
             <div className="text-center lg:text-left">
               <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-                <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-gray-900">
-                  {profile?.first_name} {profile?.name}
-                </h1>
+                {isEditing ? (
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      name="first_name"
+                      value={formData?.first_name || ''}
+                      onChange={handleChange}
+                      placeholder="Prénom"
+                      maxLength={80}
+                      aria-label="Prénom"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2 text-xl font-semibold text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-48"
+                    />
+                    <input
+                      name="name"
+                      value={formData?.name || ''}
+                      onChange={handleChange}
+                      placeholder="Nom"
+                      maxLength={80}
+                      aria-label="Nom"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2 text-xl font-semibold text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-48"
+                    />
+                  </div>
+                ) : (
+                  <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-gray-900">
+                    {profile?.first_name} {profile?.name}
+                  </h1>
+                )}
 
                 <div className="flex items-center justify-center lg:justify-start gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-sm font-medium border border-blue-100">
@@ -139,7 +155,7 @@ const HeaderProfil = ({ profile, isEditing, setIsEditing }) => {
               ) : (
                 <>
                   <Edit2 className="w-4 h-4" />
-                  Modifier
+                  Modifier mon profil
                 </>
               )}
             </button>

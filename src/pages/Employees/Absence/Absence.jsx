@@ -1,5 +1,6 @@
 // src/pages/Employees/Absence/Absence.jsx
 import React, { useState, useEffect } from 'react';
+import LottieLoader from '../../../components/lottie/LottieLoader';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import {
   getAbsences,
@@ -30,6 +31,7 @@ export default function Absence() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [formError, setFormError] = useState(''); // message affiché dans la fenêtre « Nouvelle absence »
   const [selectedAbsence, setSelectedAbsence] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
@@ -166,6 +168,25 @@ export default function Absence() {
   };
 
   const handleSaveAbsence = async () => {
+    // Contrôles avant envoi (les attributs `required` du formulaire ne sont pas appliqués : il n'y a pas de <form>)
+    if (!editingAbsence && !newAbsence.employee_id) {
+      setFormError('Veuillez sélectionner un employé.');
+      return;
+    }
+    if (!newAbsence.start_date || !newAbsence.end_date) {
+      setFormError('Veuillez renseigner les dates de début et de fin.');
+      return;
+    }
+    if (newAbsence.end_date < newAbsence.start_date) {
+      setFormError('La date de fin ne peut pas précéder la date de début.');
+      return;
+    }
+    if (!newAbsence.reason.trim()) {
+      setFormError("Veuillez indiquer la raison de l'absence.");
+      return;
+    }
+    setFormError('');
+
     try {
       // S'assurer que les noms de champs correspondent au backend
       const absenceData = {
@@ -186,10 +207,10 @@ export default function Absence() {
         setEditingAbsence(null);
         resetNewAbsence();
       } else {
-        alert(res.error || 'Erreur lors de la sauvegarde');
+        setFormError(res.error || 'Erreur lors de la sauvegarde');
       }
     } catch (err) {
-      alert('Erreur lors de la sauvegarde');
+      setFormError('Erreur lors de la sauvegarde. Vérifiez votre connexion.');
     }
   };
 
@@ -198,8 +219,9 @@ export default function Absence() {
     setNewAbsence({
       employee_id: absence.employee_id,
       type: absence.type,
-      start_date: absence.start_date || absence.startDate,
-      end_date: absence.end_date || absence.endDate,
+      // <input type="date"> n'accepte que AAAA-MM-JJ
+      start_date: String(absence.start_date || absence.startDate || '').slice(0, 10),
+      end_date: String(absence.end_date || absence.endDate || '').slice(0, 10),
       reason: absence.reason,
       notes: absence.notes || '',
       emergency_contact: absence.emergency_contact || '',
@@ -232,10 +254,7 @@ export default function Absence() {
   if (loading && !absences.length) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement des absences...</p>
-        </div>
+        <LottieLoader label="Chargement des absences..." />
       </div>
     );
   }
@@ -332,9 +351,11 @@ export default function Absence() {
             setNewAbsence={setNewAbsence}
             employees={employees}
             onSave={handleSaveAbsence}
+            error={formError}
             onClose={() => {
               setShowAbsenceModal(false);
               setEditingAbsence(null);
+              setFormError('');
               resetNewAbsence();
             }}
           />

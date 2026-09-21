@@ -1,5 +1,6 @@
 // src/pages/Jobs/JobsDetails.jsx
 import React, { useState, useEffect } from "react";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import { escapeHtml } from "../../utils/safeHtml";
 import { useParams, useNavigate } from "react-router-dom";
 import { getJobDetail, getJobApplications, updateApplicationStatus } from "../../services/jobs";
@@ -164,10 +165,7 @@ export default function JobsDetails() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement...</p>
-        </div>
+        <LottieLoader label="Chargement de l'offre..." />
       </div>
     );
   }

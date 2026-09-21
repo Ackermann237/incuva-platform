@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserDashboard, getDataAnalysis } from "../../services/dashboard";
 import { getRecruitmentManagement } from "../../services/hr";
+import { logout } from "../../services/auth";
 import RecruitmentManagement from "../../pages/HR/RecruitmentManagement";
 import DataAnalysis from "../../pages/HR/DataAnalysis";
 import Contracts from "../../pages/Contracts/Contracts";
@@ -11,6 +12,8 @@ import Planning from "../Employees/Planning/Planning.jsx";
 import Absence from "../Employees/Absence/Absence.jsx";
 import Payroll from "../Employees/Payroll/Payroll.jsx"; // IMPORT AJOUTÉ
 import Conversational from "../conversationnal/Conversational";
+import NotificationsButton from "../../components/NotificationsButton";
+import LottieLoader from "../../components/lottie/LottieLoader";
 import {
   Layers, BarChart2, Users, Briefcase, FileCheck, TrendingUp,
   Calendar, Award, Target, Building2, MapPin, DollarSign,
@@ -22,6 +25,17 @@ import {
 
 export default function EntrepriseDashboard() {
   const navigate = useNavigate();
+
+  // Déconnexion : on ferme la session côté serveur puis on revient à la page d'accueil
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.error("Erreur lors de la déconnexion:", err);
+    }
+    navigate("/", { replace: true });
+  };
+
   const [data, setData] = useState(null);
   const [recruitmentData, setRecruitmentData] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
@@ -213,10 +227,7 @@ export default function EntrepriseDashboard() {
   if (!data || loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full mx-auto animate-spin"></div>
-          <p className="text-gray-600 font-medium text-lg">Chargement de vos données...</p>
-        </div>
+        <LottieLoader label="Chargement de vos données..." size={140} />
       </div>
     );
   }
@@ -390,6 +401,7 @@ export default function EntrepriseDashboard() {
             {/* Secondary Actions */}
             <div className="space-y-2">
               <button
+                onClick={() => navigate("/settings")}
                 className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start px-3' : 'justify-center px-0'} py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all group relative overflow-hidden`}
                 title="Paramètres"
               >
@@ -403,26 +415,36 @@ export default function EntrepriseDashboard() {
                 )}
               </button>
 
-              <button
-                className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start px-3' : 'justify-center px-0'} py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all group relative overflow-hidden`}
-                title="Notifications"
-              >
-                <div className={`${isSidebarExpanded ? 'w-5 h-5' : 'w-6 h-6'} flex-shrink-0 flex items-center justify-center relative`}>
-                  <Bell className={`${isSidebarExpanded ? 'w-5 h-5' : 'w-6 h-6'} group-hover:scale-110 transition-transform`} />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                </div>
-                {isSidebarExpanded && (
-                  <span className="text-sm font-medium ml-3 whitespace-nowrap">
-                    Notifications
-                  </span>
+              <NotificationsButton
+                renderTrigger={({ onClick, unread }) => (
+                  <button
+                    onClick={onClick}
+                    className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start px-3' : 'justify-center px-0'} py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all group relative overflow-hidden`}
+                    title="Notifications"
+                  >
+                    <div className={`${isSidebarExpanded ? 'w-5 h-5' : 'w-6 h-6'} flex-shrink-0 flex items-center justify-center relative`}>
+                      <Bell className={`${isSidebarExpanded ? 'w-5 h-5' : 'w-6 h-6'} group-hover:scale-110 transition-transform`} />
+                      {unread > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 bg-red-500 text-white text-[10px] font-bold leading-4 text-center rounded-full">
+                          {unread > 9 ? "9+" : unread}
+                        </span>
+                      )}
+                    </div>
+                    {isSidebarExpanded && (
+                      <span className="text-sm font-medium ml-3 whitespace-nowrap">
+                        Notifications
+                      </span>
+                    )}
+                  </button>
                 )}
-              </button>
+              />
             </div>
           </nav>
 
           {/* User Profile & Logout */}
             <div className="p-4 border-t border-gray-100">
               <button
+                onClick={handleLogout}
                 className={`w-full flex items-center ${isSidebarExpanded ? 'justify-start px-3' : 'justify-center px-0'} py-3 rounded-xl text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all group overflow-hidden`}
                 title="Déconnexion"
               >

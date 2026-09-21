@@ -107,6 +107,7 @@ export async function setNewPassword(email, password) {
 export async function logout() {
   const res = await fetch(`${API_BASE_URL}/logout`, {
     method: "POST",
+    credentials: 'include',
   });
   return res.json();
 }
@@ -121,6 +122,17 @@ export async function updateProfile(data) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+// URL pré-signée pour déposer un fichier de portfolio (image ou PDF) ; l'envoi se fait ensuite avec uploadCvToS3
+export async function getPresignedPortfolioUrl(filename, filetype) {
+  const res = await fetch(`${API_BASE_URL}/get_presigned_portfolio_url`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, filetype }),
   });
   return res.json();
 }
