@@ -23,6 +23,7 @@ import os
 from dotenv import load_dotenv
 from ..forms.employee_form import EmployeeForm
 from ..firebase.init_firebase import db
+from ..profile_utils import clean_individual_profile
 import boto3
 from botocore.exceptions import ClientError
 
@@ -744,8 +745,8 @@ def set_new_password_api():
 
 @auth_bp.route('/logout', methods=['POST'])
 def logout_api():
-    session.pop('uid', None)
-    session.pop('account_type', None)
+    # Vide toute la session (identité, inscription ou réinitialisation en cours), pas seulement uid/account_type
+    session.clear()
     return jsonify({'success': True, 'message': 'Déconnecté'})
 
 
@@ -773,20 +774,16 @@ def update_profile():
         return jsonify({'success': False, 'error': 'Non authentifié'}), 401
 
     uid = session['uid']
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     account_type = session.get('account_type')
     update_data = {}
 
     if account_type == 'individual':
-        allowed_fields = [
-            'first_name', 'name', 'phone', 'location', 'country', 'user_role',
-            'bio', 'skills', 'languages', 'portfolio', 'experience', 'education',
-            'linkedin', 'cvUrl', 'cvName', 'achievements'
-        ]
-        for field in allowed_fields:
-            if field in data:
-                update_data[field] = data[field]
+        try:
+            update_data = clean_individual_profile(data)
+        except ValueError as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
     elif account_type == 'company':
         allowed_fields = ['company_name', 'city', 'country', 'industry', 'company_size', 'geographic_area']
         for field in allowed_fields:
@@ -803,21 +800,47 @@ def update_profile():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@auth_bp.route('/get_presigned_cv_url', methods=['POST'])
-def get_presigned_cv_url():
+# Fichiers acceptés par type de dépôt : extension -> types MIME autorisés.
+# Les fichiers sont servis depuis le domaine du stockage : on exclut tout ce qui peut contenir du script (HTML, SVG...).
+UPLOAD_RULES = {
+    'cv': {
+        'pdf': {'application/pdf'},
+        'doc': {'application/msword'},
+        'docx': {'application/vnd.openxmlformats-officedocument.wordprocessingml.document'},
+    },
+    'portfolio': {
+        'pdf': {'application/pdf'},
+        'jpg': {'image/jpeg'},
+        'jpeg': {'image/jpeg'},
+        'png': {'image/png'},
+        'gif': {'image/gif'},
+        'webp': {'image/webp'},
+    },
+}
+
+
+def _presigned_upload(kind):
+    """URL signée (PUT, 10 min) pour déposer un fichier de l'utilisateur connecté dans son dossier du stockage."""
     if 'uid' not in session:
         return jsonify({'success': False, 'error': 'Non authentifié'}), 401
+    if session.get('account_type') != 'individual':
+        return jsonify({'success': False, 'error': 'Réservé aux candidats'}), 403
 
-    data = request.get_json()
-    filename = data.get('filename')
-    filetype = data.get('filetype')
+    data = request.get_json(silent=True) or {}
+    filename = str(data.get('filename') or '')
+    filetype = str(data.get('filetype') or '')
 
     if not filename or not filetype:
         return jsonify({'success': False, 'error': 'Nom de fichier et type requis'}), 400
 
-    # Génère un nom unique
-    ext = filename.split('.')[-1].lower()
-    key = f"cv/{session['uid']}/{uuid.uuid4()}.{ext}"
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    allowed = UPLOAD_RULES[kind]
+    if ext not in allowed or filetype not in allowed[ext]:
+        accepted = ', '.join(sorted(allowed)).upper()
+        return jsonify({'success': False, 'error': f"Format non accepté. Formats autorisés : {accepted}."}), 400
+
+    # Nom unique (jamais celui du client) dans le dossier de l'utilisateur
+    key = f"{kind}/{session['uid']}/{uuid.uuid4()}.{ext}"
 
     try:
         s3_client = boto3.client(
@@ -850,8 +873,18 @@ def get_presigned_cv_url():
         })
 
     except Exception as e:
-        print(f"Erreur S3 dans get_presigned_cv_url: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        print(f"Erreur S3 dans _presigned_upload ({kind}): {e}")
+        return jsonify({'success': False, 'error': "Le stockage des fichiers est indisponible pour le moment."}), 500
+
+
+@auth_bp.route('/get_presigned_cv_url', methods=['POST'])
+def get_presigned_cv_url():
+    return _presigned_upload('cv')
+
+
+@auth_bp.route('/get_presigned_portfolio_url', methods=['POST'])
+def get_presigned_portfolio_url():
+    return _presigned_upload('portfolio')
 
 
 @auth_bp.route('/profile/check', methods=['GET'])

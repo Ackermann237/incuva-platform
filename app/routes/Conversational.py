@@ -1,19 +1,43 @@
 # backend/app/routes/conversational.py
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, Response, jsonify, request, session, stream_with_context
 from firebase_admin import firestore
 import datetime
+import json
 import logging
 import re
+import time
+from collections import defaultdict, deque
 from functools import wraps
 
 from typing import Dict, List
 
 from ..firebase.init_firebase import db
 from ..ai.copilote import generate_bi_insights, call_ia, chat_general
-from ..ai.nlp_processor import get_nlp_processor
+from ..ai import jarvis
+
+try:
+    from ..ai.nlp_processor import get_nlp_processor
+except ImportError:  # torch / spacy / sentence-transformers non installés (ex. hébergement gratuit léger)
+    get_nlp_processor = None
 
 logger = logging.getLogger(__name__)
 conversational_bp = Blueprint('conversational', __name__, url_prefix='/api/conversational')
+
+# Limite simple par entreprise pour protéger le quota du modèle : 30 questions par 5 minutes
+RATE_LIMIT_MAX = 30
+RATE_LIMIT_WINDOW = 300
+_recent_questions = defaultdict(deque)
+
+
+def _rate_limited(company_id):
+    now = time.time()
+    recent = _recent_questions[company_id]
+    while recent and now - recent[0] > RATE_LIMIT_WINDOW:
+        recent.popleft()
+    if len(recent) >= RATE_LIMIT_MAX:
+        return True
+    recent.append(now)
+    return False
 
 
 def company_required(f):
@@ -26,6 +50,67 @@ def company_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+
+def _prepare_question():
+    """Valide la requête et prépare (contexte entreprise, historique). Retourne (contexte, messages, erreur)."""
+    company_id = session['uid']
+    body = request.get_json(silent=True) or {}
+    messages = jarvis.clean_history(body.get('messages'))
+    if not messages:
+        return None, None, (jsonify({'success': False, 'error': 'Aucune question à traiter'}), 400)
+    if _rate_limited(company_id):
+        return None, None, (jsonify({'success': False,
+                                     'error': 'Trop de questions en peu de temps. Réessayez dans quelques minutes.'}), 429)
+    try:
+        context = jarvis.build_company_context(db, company_id)
+    except Exception as e:
+        # Sans contexte, Jarvis répond quand même aux questions générales
+        logger.error(f"Contexte entreprise indisponible : {e}")
+        context = '{"avertissement":"Les données de l\'entreprise sont momentanément indisponibles."}'
+    return context, messages, None
+
+
+@conversational_bp.route('/ask', methods=['POST'])
+@company_required
+def ask():
+    """Question à Jarvis, réponse complète : {messages: [{role, content}, ...]}."""
+    context, messages, error = _prepare_question()
+    if error:
+        return error
+    try:
+        answer, suggestions = jarvis.split_suggestions(jarvis.complete(context, messages))
+        return jsonify({'success': True, 'answer': answer, 'suggestions': suggestions})
+    except Exception as e:
+        logger.error(f"Erreur Jarvis : {e}", exc_info=True)
+        return jsonify({'success': False, 'error': "Jarvis n'a pas pu répondre pour le moment."}), 502
+
+
+@conversational_bp.route('/ask/stream', methods=['POST'])
+@company_required
+def ask_stream():
+    """Question à Jarvis, réponse en flux (Server-Sent Events) : événements {token} puis {done, suggestions}."""
+    context, messages, error = _prepare_question()
+    if error:
+        return error
+
+    def event(payload):
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    def generate():
+        full_text = ''
+        try:
+            for token in jarvis.stream_tokens(context, messages):
+                full_text += token
+                yield event({'token': token})
+            answer, suggestions = jarvis.split_suggestions(full_text)
+            yield event({'done': True, 'answer': answer, 'suggestions': suggestions})
+        except Exception as e:
+            logger.error(f"Erreur Jarvis (flux) : {e}", exc_info=True)
+            yield event({'error': "Jarvis n'a pas pu répondre pour le moment."})
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
 
 @conversational_bp.route('/analyze', methods=['POST'])

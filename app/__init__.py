@@ -86,9 +86,11 @@ def create_app():
     app.contract_service = ContractService(app.db)
 
     # Register blueprints
-    from .routes import main, auth, dashboard, hr, messaging, jobs, contracts, users, employees, TrainingInterview, TechnicalTest, planning, absences, payroll, VisioTraining, ai_routes, Conversational
+    from .routes import main, auth, dashboard, hr, messaging, jobs, contracts, users, employees, TrainingInterview, TechnicalTest, planning, absences, payroll, VisioTraining, ai_routes, Conversational, notifications
 
     csrf.exempt(main.main_api_bp)
+    csrf.exempt(notifications.notifications_bp)
+    csrf.exempt(notifications.settings_bp)
     csrf.exempt(users.users_bp)
     csrf.exempt(employees.employees_bp)
     csrf.exempt(auth.auth_bp)
@@ -108,6 +110,8 @@ def create_app():
     csrf.exempt(Conversational.conversational_bp)
 
     app.register_blueprint(main.main_api_bp, url_prefix='/')
+    app.register_blueprint(notifications.notifications_bp, url_prefix='/notifications')
+    app.register_blueprint(notifications.settings_bp, url_prefix='/settings')
     app.register_blueprint(auth.auth_bp, url_prefix='/auth')
     app.register_blueprint(dashboard.dashboard_bp, url_prefix='/dashboard')
     app.register_blueprint(hr.hr_bp, url_prefix='/hr')
@@ -136,6 +140,10 @@ def create_app():
         g.job_service = app.job_service
         g.favorite_service = app.favorite_service
         g.contract_service = app.contract_service
+
+    # Le stockage des fichiers est privé : les adresses de CV / pièces jointes / portfolio sont signées à la volée
+    from .storage_urls import sign_json_response
+    app.after_request(sign_json_response)
 
     CORS(app, supports_credentials=True)
     return app

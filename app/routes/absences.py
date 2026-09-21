@@ -24,6 +24,25 @@ def company_required(f):
     return decorated_function
 
 
+ALLOWED_TYPES = {'vacation', 'sick', 'maternity', 'paternity', 'training', 'personal', 'other'}
+ALLOWED_STATUSES = {'pending', 'approved', 'rejected'}
+
+
+def _parse_date(value, label):
+    """Date AAAA-MM-JJ (les heures éventuelles sont ignorées) ; ValueError avec un message lisible sinon."""
+    try:
+        return datetime.datetime.strptime(str(value or '').strip()[:10], '%Y-%m-%d')
+    except ValueError:
+        raise ValueError(f"{label} invalide (format attendu : AAAA-MM-JJ).")
+
+
+def _iso_day(value):
+    """Date au format AAAA-MM-JJ (les navigateurs et <input type="date"> l'attendent) à partir d'un datetime ou d'un texte."""
+    if isinstance(value, datetime.datetime):
+        return value.strftime('%Y-%m-%d')
+    return str(value)[:10] if value else None
+
+
 @absences_bp.route('/', methods=['GET'])
 @company_required
 def get_absences():
@@ -51,15 +70,23 @@ def get_absences():
             data = doc.to_dict()
             data['id'] = doc.id
 
-            # Récupérer les infos de l'employé
-            if 'employee_id' in data:
-                employee_doc = db.collection('employees').document(data['employee_id']).get()
-                if employee_doc.exists:
-                    emp_data = employee_doc.to_dict()
-                    data['employeeName'] = emp_data.get('candidate_name', 'Inconnu')
-                    data['position'] = emp_data.get('position', 'Non spécifié')
-                    data['department'] = emp_data.get('department', 'Non spécifié')
+            # Une absence sans employé est une donnée invalide (créée avant l'ajout des contrôles) : on l'ignore
+            # au lieu de faire échouer toute la liste (Firestore refuse un identifiant de document vide)
+            employee_id = data.get('employee_id')
+            if not employee_id or not isinstance(employee_id, str) or '/' in employee_id:
+                continue
 
+            employee_doc = db.collection('employees').document(employee_id).get()
+            if employee_doc.exists:
+                emp_data = employee_doc.to_dict()
+                data['employeeName'] = emp_data.get('candidate_name', 'Inconnu')
+                data['position'] = emp_data.get('position', 'Non spécifié')
+                data['department'] = emp_data.get('department', 'Non spécifié')
+            else:
+                data['employeeName'] = 'Employé supprimé'
+
+            data['start_date'] = _iso_day(data.get('start_date'))
+            data['end_date'] = _iso_day(data.get('end_date'))
             absences.append(data)
 
         return jsonify({
@@ -85,7 +112,8 @@ def get_absence_stats():
 
         for doc in absences_ref.stream():
             data = doc.to_dict()
-            absences.append(data)
+            if data.get('employee_id'):  # les absences sans employé (données invalides) ne comptent pas
+                absences.append(data)
 
         # Calculer les statistiques
         stats = {
@@ -181,25 +209,37 @@ def create_absence():
     """Créer une nouvelle absence"""
     try:
         company_id = session['uid']
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
-        # Validation des données
-        required_fields = ['employee_id', 'type', 'start_date', 'end_date', 'reason']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'success': False, 'error': f'Champ manquant: {field}'}), 400
+        # Validation : un employé de l'entreprise, un type connu, des dates cohérentes, une raison
+        employee_id = str(data.get('employee_id') or '').strip()
+        if not employee_id:
+            return jsonify({'success': False, 'error': 'Veuillez sélectionner un employé.'}), 400
+        employee_doc = db.collection('employees').document(employee_id).get() if '/' not in employee_id else None
+        if not employee_doc or not employee_doc.exists or employee_doc.to_dict().get('company_id') != company_id:
+            return jsonify({'success': False, 'error': "Cet employé n'existe pas dans votre entreprise."}), 400
+        absence_type = data.get('type')
+        if absence_type not in ALLOWED_TYPES:
+            return jsonify({'success': False, 'error': "Type d'absence invalide."}), 400
+        start_date = _parse_date(data.get('start_date'), 'Date de début')
+        end_date = _parse_date(data.get('end_date'), 'Date de fin')
+        if end_date < start_date:
+            return jsonify({'success': False, 'error': 'La date de fin ne peut pas précéder la date de début.'}), 400
+        reason = str(data.get('reason') or '').strip()
+        if not reason:
+            return jsonify({'success': False, 'error': "Veuillez indiquer la raison de l'absence."}), 400
 
         # Créer le document
         absence_data = {
             'company_id': company_id,
-            'employee_id': data['employee_id'],
-            'type': data['type'],
-            'start_date': datetime.datetime.strptime(data['start_date'], '%Y-%m-%d'),
-            'end_date': datetime.datetime.strptime(data['end_date'], '%Y-%m-%d'),
-            'reason': data['reason'],
-            'notes': data.get('notes', ''),
-            'emergency_contact': data.get('emergency_contact', ''),
-            'documents': data.get('documents', []),
+            'employee_id': employee_id,
+            'type': absence_type,
+            'start_date': start_date,
+            'end_date': end_date,
+            'reason': reason[:500],
+            'notes': str(data.get('notes') or '')[:2000],
+            'emergency_contact': str(data.get('emergency_contact') or '')[:200],
+            'documents': data.get('documents') if isinstance(data.get('documents'), list) else [],
             'status': 'pending',
             'created_at': datetime.datetime.now(),
             'updated_at': datetime.datetime.now()
@@ -214,6 +254,8 @@ def create_absence():
             'absence_id': doc_ref[1].id
         })
 
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         logger.error(f"Erreur lors de la création de l'absence: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -225,7 +267,7 @@ def update_absence(absence_id):
     """Mettre à jour une absence"""
     try:
         company_id = session['uid']
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
         # Vérifier que l'absence appartient à l'entreprise
         absence_doc = db.collection('absences').document(absence_id).get()
@@ -248,9 +290,24 @@ def update_absence(absence_id):
         for field in updatable_fields:
             if field in data:
                 if field in ['start_date', 'end_date'] and data[field]:
-                    update_data[field] = datetime.datetime.strptime(data[field], '%Y-%m-%d')
+                    update_data[field] = _parse_date(data[field], 'Date de début' if field == 'start_date' else 'Date de fin')
                 else:
                     update_data[field] = data[field]
+
+        if 'type' in update_data and update_data['type'] not in ALLOWED_TYPES:
+            return jsonify({'success': False, 'error': "Type d'absence invalide."}), 400
+        if 'status' in update_data and update_data['status'] not in ALLOWED_STATUSES:
+            return jsonify({'success': False, 'error': 'Statut invalide.'}), 400
+        if 'reason' in update_data and not str(update_data['reason'] or '').strip():
+            return jsonify({'success': False, 'error': "Veuillez indiquer la raison de l'absence."}), 400
+
+        # Les dates finales (modifiées ou conservées) doivent rester cohérentes
+        def as_naive(value):
+            return value.replace(tzinfo=None) if isinstance(value, datetime.datetime) else None
+        final_start = update_data.get('start_date') or as_naive(absence_data.get('start_date'))
+        final_end = update_data.get('end_date') or as_naive(absence_data.get('end_date'))
+        if final_start and final_end and final_end < final_start:
+            return jsonify({'success': False, 'error': 'La date de fin ne peut pas précéder la date de début.'}), 400
 
         # Mettre à jour
         db.collection('absences').document(absence_id).update(update_data)
@@ -260,6 +317,8 @@ def update_absence(absence_id):
             'message': 'Absence mise à jour avec succès'
         })
 
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         logger.error(f"Erreur lors de la mise à jour de l'absence: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500

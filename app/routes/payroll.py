@@ -10,6 +10,7 @@ from functools import wraps
 
 from .contracts import generate_first_payslip
 from ..ai.payroll_ia import PayrollAIManager
+from ..ai import payroll_analysis, llm
 from ..firebase.init_firebase import db
 from ..query_utils import latest_doc, sort_docs_desc
 from ..ai.manage import get_ai_manager, HFChatClient
@@ -33,21 +34,16 @@ def company_required(f):
 @payroll_bp.route('/ai/analyze_payroll', methods=['POST'])
 @company_required
 def analyze_payroll_ai():
+    """Analyse complète de la paie de l'entreprise.
+
+    Tout est recalculé côté serveur à partir des bulletins réels (les données envoyées par le navigateur sont ignorées) :
+    indicateurs, anomalies, score de santé, projection, comparaison avec la dernière analyse, puis commentaire de l'IA.
+    """
     try:
-        payload = request.get_json() or {}
-        payroll_data = payload.get('payroll_data')
-
-        if not payroll_data:
-            return jsonify({'success': False, 'error': 'Données de paie manquantes'}), 400
-
-        payroll_ai = get_ai_manager("payroll")
-        result = payroll_ai.analyze_payroll_trends(payroll_data)
-
-        return jsonify(result)
-
+        return jsonify({'success': True, 'analysis': payroll_analysis.analyze(db, session['uid'])})
     except Exception as e:
-        logger.error(f"Erreur IA Paie: {str(e)}")
-        return jsonify({'success': False, 'error': 'Erreur lors de l’analyse IA'}), 500
+        logger.error(f"Erreur IA Paie: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': "Erreur lors de l'analyse de la paie"}), 500
 
 
 
@@ -854,66 +850,20 @@ def get_all_payslips_for_ai():
 def query_payroll_ai():
     """Répondre aux questions spécifiques sur la paie"""
     try:
-        payload = request.get_json() or {}
-        question = payload.get('question')
-        context = payload.get('context', {})
-
+        payload = request.get_json(silent=True) or {}
+        question = (payload.get('question') or '').strip()
         if not question:
             return jsonify({'success': False, 'error': 'Question manquante'}), 400
 
-        # Récupérer les données nécessaires
-        company_id = session['uid']
+        # Le modèle répond à partir des indicateurs recalculés sur les vrais bulletins de l'entreprise
+        answer = payroll_analysis.answer_question(db, session['uid'], question)
+        return jsonify({'success': True, 'answer': answer})
 
-        # Récupérer les bulletins récents pour le contexte
-        payslips_ref = db.collection('payslips') \
-            .where('company_id', '==', company_id)
-
-        recent_payslips = []
-        for doc in sort_docs_desc(payslips_ref.stream(), 'period_end')[:20]:
-            data = doc.to_dict()
-            data['id'] = doc.id
-            recent_payslips.append(data)
-
-        # Préparer le contexte avec une fonction locale
-        def summarize_payslips(payslips):
-            """Résume les bulletins pour le contexte IA"""
-            summary = {
-                'total': len(payslips),
-                'by_status': {},
-                'total_gross': 0,
-                'total_net': 0,
-                'recent_periods': []
-            }
-
-            for payslip in payslips[:5]:  # 5 plus récents
-                status = payslip.get('status', 'unknown')
-                summary['by_status'][status] = summary['by_status'].get(status, 0) + 1
-                summary['total_gross'] += payslip.get('gross_salary', 0)
-                summary['total_net'] += payslip.get('net_salary', 0)
-
-                if 'period_end' in payslip:
-                    summary['recent_periods'].append(payslip.get('period_end'))
-
-            return summary
-
-        ai_context = {
-            'company_id': company_id,
-            'recent_payslips_count': len(recent_payslips),
-            'recent_payslips_summary': summarize_payslips(recent_payslips),
-            'user_context': context
-        }
-
-        # Utiliser l'IA pour répondre
-        payroll_ai = get_ai_manager("payroll")
-        answer = payroll_ai.answer_payroll_question(question, ai_context)
-
-        return jsonify({
-            'success': True,
-            'answer': answer
-        })
-
+    except llm.LLMUnavailable as e:
+        logger.error(f"Question paie : IA indisponible ({e})")
+        return jsonify({'success': False, 'error': "L'assistant IA est momentanément indisponible."}), 503
     except Exception as e:
-        logger.error(f"Erreur query IA Paie: {str(e)}")
+        logger.error(f"Erreur query IA Paie: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': 'Erreur lors de la réponse IA'}), 500
 
 

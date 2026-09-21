@@ -7,6 +7,7 @@ from ..services.messaging_service import MessagingService
 from ..hr.contracts_generator import ContractGenerator
 from ..firebase.init_firebase import db
 from ..user_utils import display_name
+from .notifications import create_notification
 import logging
 import datetime
 
@@ -281,6 +282,11 @@ def create_contract_api(chat_id, candidate_id):
                 'position': position,
                 'contract_link': contract_link
             }
+        )
+        create_notification(
+            db, candidate_id, 'contract_received', 'Nouveau contrat à consulter',
+            f"{company_name} vous a envoyé un contrat pour le poste « {position} ».",
+            data={'contract_id': contract_id, 'company_id': session['uid']},
         )
 
         return jsonify({
